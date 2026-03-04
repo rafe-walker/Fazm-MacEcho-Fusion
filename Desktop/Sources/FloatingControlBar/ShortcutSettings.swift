@@ -18,7 +18,7 @@ class ShortcutSettings: ObservableObject {
         var symbol: String {
             switch self {
             case .option: return "\u{2325}"
-            case .rightCommand: return "\u{2318}"
+            case .rightCommand: return "Right \u{2318}"
             case .fn: return "\u{1F310}"
             }
         }
