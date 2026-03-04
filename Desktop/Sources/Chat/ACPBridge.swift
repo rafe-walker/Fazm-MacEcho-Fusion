@@ -31,6 +31,9 @@ actor ACPBridge {
   /// Callback for thinking text deltas
   typealias ThinkingDeltaHandler = @Sendable (String) -> Void
 
+  /// Callback for text block boundary (new content block from API)
+  typealias TextBlockBoundaryHandler = @Sendable () -> Void
+
   /// Callback for tool result display (toolUseId, name, output)
   typealias ToolResultDisplayHandler = @Sendable (String, String, String) -> Void
 
@@ -45,6 +48,7 @@ actor ACPBridge {
     case `init`(sessionId: String)
     case textDelta(text: String)
     case thinkingDelta(text: String)
+    case textBlockBoundary
     case toolUse(callId: String, name: String, input: [String: Any])
     case toolActivity(name: String, status: String, toolUseId: String?, input: [String: Any]?)
     case toolResultDisplay(toolUseId: String, name: String, output: String)
@@ -326,6 +330,7 @@ actor ACPBridge {
     onToolCall: @escaping ToolCallHandler,
     onToolActivity: @escaping ToolActivityHandler,
     onThinkingDelta: @escaping ThinkingDeltaHandler = { _ in },
+    onTextBlockBoundary: @escaping TextBlockBoundaryHandler = {},
     onToolResultDisplay: @escaping ToolResultDisplayHandler = { _, _, _ in },
     onAuthRequired: @escaping AuthRequiredHandler = { _, _ in },
     onAuthSuccess: @escaping AuthSuccessHandler = {}
@@ -447,6 +452,9 @@ actor ACPBridge {
       case .thinkingDelta(let text):
         onThinkingDelta(text)
 
+      case .textBlockBoundary:
+        onTextBlockBoundary()
+
       case .toolActivity(let name, let status, let toolUseId, let input):
         onToolActivity(name, status, toolUseId, input)
 
@@ -556,6 +564,9 @@ actor ACPBridge {
     case "thinking_delta":
       let text = dict["text"] as? String ?? ""
       return .thinkingDelta(text: text)
+
+    case "text_block_boundary":
+      return .textBlockBoundary
 
     case "tool_activity":
       let name = dict["name"] as? String ?? ""
