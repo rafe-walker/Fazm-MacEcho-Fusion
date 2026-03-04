@@ -148,6 +148,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // Without this, writing to a dead FFmpeg stdin or agent-bridge pipe kills the process.
         signal(SIGPIPE, SIG_IGN)
 
+        // Disable App Nap — the floating bar relies on global event monitors and timers
+        // that stop firing when macOS naps the process.
+        ProcessInfo.processInfo.disableAutomaticTermination("Floating bar active")
+        ProcessInfo.processInfo.disableSuddenTermination()
+        _ = ProcessInfo.processInfo.beginActivity(
+            options: .userInitiatedAllowingIdleSystemSleep,
+            reason: "Push-to-talk event monitors must stay active"
+        )
+
         // Strip com.apple.provenance xattrs that macOS adds when Sparkle extracts updates.
         // These break the code signature seal, causing the NEXT update to fail with
         // "An error occurred while running the updater."
