@@ -7,15 +7,16 @@ struct SilenceOverlayView: View {
     var onDismiss: () -> Void
 
     var body: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 6) {
                 Image(systemName: "mic.slash.fill")
                     .foregroundColor(.orange)
                     .font(.system(size: 13))
                 Text("Didn't catch that — try a different mic?")
                     .scaledFont(size: 12, weight: .medium)
                     .foregroundColor(.white)
-                Spacer()
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 4)
                 Button {
                     onDismiss()
                 } label: {
