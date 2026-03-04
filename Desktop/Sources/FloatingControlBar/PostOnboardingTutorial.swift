@@ -69,12 +69,16 @@ class PostOnboardingTutorialManager {
     }
 
     private func show() {
-        guard window == nil else { return }
+        guard window == nil else {
+            log("PostOnboardingTutorial: show() skipped — window already exists")
+            return
+        }
 
         let tutorialWindow = PostOnboardingTutorialWindow(viewModel: viewModel)
         self.window = tutorialWindow
 
         positionBelowBar(tutorialWindow)
+        log("PostOnboardingTutorial: show() — window frame=\(tutorialWindow.frame), barFrame=\(FloatingControlBarManager.shared.barWindowFrame ?? .zero)")
         viewModel.startPulse()
 
         // Re-position when step changes (content size changes)
@@ -156,6 +160,26 @@ class PostOnboardingTutorialManager {
             self?.window?.orderOut(nil)
             self?.window = nil
         })
+    }
+
+    /// Force-replay the tutorial (for debugging / demos).
+    func replay(barState: FloatingControlBarState) {
+        // Tear down any existing tutorial immediately (no animation)
+        cancellables.removeAll()
+        viewModel.stopPulse()
+        window?.orderOut(nil)
+        window = nil
+
+        // Reset state
+        viewModel = TutorialViewModel()
+        UserDefaults.standard.set(false, forKey: userDefaultsKey)
+
+        // Show after a brief delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            guard let self else { return }
+            self.show()
+            self.observeVoiceState(barState: barState)
+        }
     }
 }
 
