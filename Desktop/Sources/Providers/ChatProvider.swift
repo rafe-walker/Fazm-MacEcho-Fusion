@@ -378,6 +378,9 @@ A screenshot may be attached — use it silently only if relevant. Never mention
     private var streamingBufferMessageId: String?
     private var streamingFlushWorkItem: DispatchWorkItem?
     private let streamingFlushInterval: TimeInterval = 0.1
+    /// When true, the next text buffer flush creates a new .text content block
+    /// instead of appending to the existing one. Set by text_block_boundary events.
+    private var forceNewTextBlock: Bool = false
 
     // MARK: - Filtered Sessions
     var filteredSessions: [ChatSession] {
@@ -1826,6 +1829,12 @@ A screenshot may be attached — use it silently only if relevant. Never mention
                 sender: .user
             )
             messages.append(userMessage)
+
+            // Persist onboarding messages locally for restart recovery
+            if isOnboarding {
+                let msg = userMessage
+                Task { await OnboardingChatPersistence.saveMessage(msg) }
+            }
         }
 
         // Create a placeholder AI message shown immediately in the UI while
@@ -1929,6 +1938,11 @@ A screenshot may be attached — use it silently only if relevant. Never mention
                     self?.addToolResult(messageId: aiMessageId, toolUseId: toolUseId, name: name, output: output)
                 }
             }
+            let textBlockBoundaryHandler: ACPBridge.TextBlockBoundaryHandler = { [weak self] in
+                Task { @MainActor [weak self] in
+                    self?.handleTextBlockBoundary(messageId: aiMessageId)
+                }
+            }
 
             let queryResult = try await acpBridge.query(
                 prompt: trimmedText,
@@ -1943,6 +1957,7 @@ A screenshot may be attached — use it silently only if relevant. Never mention
                 onToolCall: toolCallHandler,
                 onToolActivity: toolActivityHandler,
                 onThinkingDelta: thinkingDeltaHandler,
+                onTextBlockBoundary: textBlockBoundaryHandler,
                 onToolResultDisplay: toolResultDisplayHandler,
                 onAuthRequired: { [weak self] methods, authUrl in
                     Task { @MainActor [weak self] in
@@ -1972,6 +1987,13 @@ A screenshot may be attached — use it silently only if relevant. Never mention
                 messages[index].text = messageText
                 messages[index].isStreaming = false
                 completeRemainingToolCalls(messageId: aiMessageId)
+
+                // Persist AI message locally for onboarding restart recovery
+                // Must happen before backend save which replaces the message ID
+                if isOnboarding, !messageText.isEmpty {
+                    let msg = messages[index]
+                    Task { await OnboardingChatPersistence.saveMessage(msg) }
+                }
             } else {
                 // Message no longer in memory (user switched away from this session).
                 messageText = queryResult.text
@@ -2034,6 +2056,9 @@ A screenshot may be attached — use it silently only if relevant. Never mention
             if isOnboarding && !queryResult.sessionId.isEmpty {
                 OnboardingChatPersistence.saveSessionId(queryResult.sessionId)
             }
+
+
+
 
             // Analytics: track query completion
             let durationMs = Int(Date().timeIntervalSince(queryStartTime) * 1000)
@@ -2194,6 +2219,16 @@ A screenshot may be attached — use it silently only if relevant. Never mention
         }
     }
 
+    /// Handle a text block boundary from the bridge. Flushes any buffered text
+    /// so it lands in its own content block, then marks the next flush to create
+    /// a new block rather than appending to the previous one.
+    private func handleTextBlockBoundary(messageId: String) {
+        if streamingBufferMessageId == messageId && !streamingTextBuffer.isEmpty {
+            flushStreamingBuffer()
+        }
+        forceNewTextBlock = true
+    }
+
     /// Flush accumulated text and thinking deltas to the published messages array.
     private func flushStreamingBuffer() {
         streamingFlushWorkItem = nil
@@ -2212,12 +2247,14 @@ A screenshot may be attached — use it silently only if relevant. Never mention
 
             messages[index].text += buffered
 
-            if let lastBlockIndex = messages[index].contentBlocks.indices.last,
+            if !forceNewTextBlock,
+               let lastBlockIndex = messages[index].contentBlocks.indices.last,
                case .text(let blockId, let existing) = messages[index].contentBlocks[lastBlockIndex] {
                 messages[index].contentBlocks[lastBlockIndex] = .text(id: blockId, text: existing + buffered)
             } else {
                 messages[index].contentBlocks.append(.text(id: UUID().uuidString, text: buffered))
             }
+            forceNewTextBlock = false
         }
 
         // Flush thinking buffer
@@ -2244,6 +2281,15 @@ A screenshot may be attached — use it silently only if relevant. Never mention
     }
 
     private func addToolActivity(messageId: String, toolName: String, status: ToolCallStatus, toolUseId: String? = nil, input: [String: Any]? = nil) {
+        // Flush any buffered text/thinking BEFORE inserting the tool activity block.
+        // Without this, text from before the tool call (e.g. "work!") and text from
+        // after (e.g. "What are you working on?") get concatenated in the buffer
+        // and rendered as one jammed block ("work!What are you working on?").
+        if streamingBufferMessageId == messageId &&
+            (!streamingTextBuffer.isEmpty || !streamingThinkingBuffer.isEmpty) {
+            flushStreamingBuffer()
+        }
+
         guard let index = messages.firstIndex(where: { $0.id == messageId }) else { return }
 
         let toolInput = input.flatMap { ChatContentBlock.toolInputSummary(for: toolName, input: $0) }
