@@ -11,6 +11,9 @@ extension UserDefaults {
     @objc dynamic var playwrightUseExtension: Bool {
         return bool(forKey: "playwrightUseExtension")
     }
+    @objc dynamic var playwrightExtensionToken: String? {
+        return string(forKey: "playwrightExtensionToken")
+    }
 }
 
 // MARK: - Chat Session Model
@@ -362,6 +365,7 @@ A screenshot may be attached — use it silently only if relevant. Never mention
     private let maxMessagesInMemory = 200
     private var multiChatObserver: AnyCancellable?
     private var playwrightExtensionObserver: AnyCancellable?
+    private var playwrightTokenObserver: AnyCancellable?
     private var sessionGroupingObserver: AnyCancellable?
 
     // MARK: - Cross-Platform Message Polling
@@ -496,6 +500,30 @@ A screenshot may be attached — use it silently only if relevant. Never mention
                         log("ChatProvider: ACP bridge restarted with new Playwright settings")
                     } catch {
                         logError("Failed to restart ACP bridge after Playwright setting change", error: error)
+                    }
+                }
+            }
+
+        // Observe changes to Playwright extension token — restart bridge to pick up new token
+        playwrightTokenObserver = UserDefaults.standard.publisher(for: \.playwrightExtensionToken)
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                Task { @MainActor in
+                    guard let self = self else { return }
+                    guard !self.isSending else {
+                        log("ChatProvider: Skipping bridge restart for token change — query in progress")
+                        return
+                    }
+                    guard self.acpBridgeStarted else { return }
+                    log("ChatProvider: Playwright extension token changed, restarting ACP bridge")
+                    self.acpBridgeStarted = false
+                    do {
+                        try await self.acpBridge.restart()
+                        self.acpBridgeStarted = true
+                        log("ChatProvider: ACP bridge restarted with new Playwright token")
+                    } catch {
+                        logError("Failed to restart ACP bridge after Playwright token change", error: error)
                     }
                 }
             }
@@ -1924,10 +1952,19 @@ A screenshot may be attached — use it silently only if relevant. Never mention
                                 log("ChatProvider: Browser tool active — showing floating bar so it stays above Chrome")
                                 FloatingControlBarManager.shared.showTemporarily()
                             }
+                            // Suppress click-outside dismiss while browser tools run
+                            activeBrowserToolCount += 1
+                            FloatingControlBarManager.shared.setSuppressClickOutsideDismiss(true)
                         }
                     } else if status == "completed", let startTime = toolStartTimes.removeValue(forKey: name) {
                         let durationMs = Int(Date().timeIntervalSince(startTime) * 1000)
                         AnalyticsManager.shared.chatToolCallCompleted(toolName: name, durationMs: durationMs)
+                        if (name.contains("browser") || name.contains("playwright")) {
+                            activeBrowserToolCount = max(0, activeBrowserToolCount - 1)
+                            if activeBrowserToolCount == 0 {
+                                FloatingControlBarManager.shared.setSuppressClickOutsideDismiss(false)
+                            }
+                        }
                     }
                 }
             }
