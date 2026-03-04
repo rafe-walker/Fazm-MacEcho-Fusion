@@ -71,6 +71,12 @@ struct AskAIInputView: View {
                     .onAppear {
                         localInput = userInput
                     }
+                    .onChange(of: userInput) { _, newValue in
+                        // Sync external changes (e.g. PTT transcription) into local state
+                        if newValue != localInput {
+                            localInput = newValue
+                        }
+                    }
                 }
                 .padding(.horizontal, 4)
                 .frame(height: textHeight)
