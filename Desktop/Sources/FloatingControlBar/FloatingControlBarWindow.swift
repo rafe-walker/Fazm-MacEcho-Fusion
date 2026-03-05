@@ -1072,8 +1072,10 @@ class FloatingControlBarManager {
         window.showAIConversation()
         window.orderFrontRegardless()
 
-        // Send the query through the normal streaming path
+        // Restart the bridge so it picks up the newly-saved Playwright token,
+        // then send the query through the normal streaming path.
         Task { @MainActor in
+            await provider.restartBridgeForNewToken()
             await self.sendAIQuery(text, barWindow: window, provider: provider)
         }
     }
