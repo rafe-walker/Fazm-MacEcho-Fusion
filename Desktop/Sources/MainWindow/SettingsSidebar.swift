@@ -21,19 +21,19 @@ struct SettingsSearchItem: Identifiable {
 
     static let allSearchableItems: [SettingsSearchItem] = [
         // General
-        SettingsSearchItem(name: "Ask Fazm", subtitle: "Show or hide the floating chat bar", keywords: ["floating bar", "chat bar"], section: .general, advancedSubsection: nil, icon: "gearshape", settingId: "general.askomi"),
+        SettingsSearchItem(name: "Ask Fazm", subtitle: "Show or hide the floating chat bar", keywords: ["floating bar", "chat bar"], section: .advanced, advancedSubsection: .preferences, icon: "slider.horizontal.3", settingId: "advanced.preferences.askomi"),
         SettingsSearchItem(name: "Font Size", subtitle: "Adjust text size across the app", keywords: ["text size", "zoom", "scale", "reset"], section: .general, advancedSubsection: nil, icon: "gearshape", settingId: "general.fontsize"),
         SettingsSearchItem(name: "Reset Window Size", subtitle: "Restore the default window dimensions", keywords: ["resize", "window", "default size"], section: .general, advancedSubsection: nil, icon: "gearshape", settingId: "general.resetwindow"),
 
-        // AI Chat
-        SettingsSearchItem(name: "AI Chat", subtitle: "Configure AI assistant settings", keywords: ["claude", "chat settings"], section: .aiChat, advancedSubsection: nil, icon: "cpu", settingId: "aichat.aichat"),
-        SettingsSearchItem(name: "Ask Mode", subtitle: "Show an Ask/Act toggle in the chat to control tool use", keywords: ["ask", "act", "read only", "mode toggle"], section: .aiChat, advancedSubsection: nil, icon: "cpu", settingId: "aichat.askmode"),
-        SettingsSearchItem(name: "CLAUDE.md", subtitle: "Personal instructions loaded into AI chat", keywords: ["claude md", "claude config", "instructions", "view"], section: .aiChat, advancedSubsection: nil, icon: "cpu", settingId: "aichat.claudemd"),
-        SettingsSearchItem(name: "Skills", subtitle: "Enable or disable discovered AI skills", keywords: ["skills", "plugins", "abilities", "view"], section: .aiChat, advancedSubsection: nil, icon: "cpu", settingId: "aichat.skills"),
-        SettingsSearchItem(name: "Browser Extension", subtitle: "Lets the AI use your Chrome browser with all your logged-in sessions", keywords: ["playwright", "chrome", "browser extension", "browser", "set up", "reconfigure", "token"], section: .aiChat, advancedSubsection: nil, icon: "cpu", settingId: "aichat.browserextension"),
-        SettingsSearchItem(name: "Workspace", subtitle: "Set a project directory for AI chat context", keywords: ["workspace", "project", "directory", "folder", "working directory", "claude.md"], section: .aiChat, advancedSubsection: nil, icon: "cpu", settingId: "aichat.workspace"),
-        SettingsSearchItem(name: "AI Provider", subtitle: "Choose between Agent SDK and Claude Code for AI chat", keywords: ["provider", "agent sdk", "claude code", "acp", "bridge mode"], section: .aiChat, advancedSubsection: nil, icon: "cpu", settingId: "aichat.provider"),
-        SettingsSearchItem(name: "Dev Mode", subtitle: "Developer tools and debugging options", keywords: ["developer", "debug", "dev mode", "development"], section: .aiChat, advancedSubsection: nil, icon: "cpu", settingId: "aichat.devmode"),
+        // AI Chat (under Advanced)
+        SettingsSearchItem(name: "AI Chat", subtitle: "Configure AI assistant settings", keywords: ["claude", "chat settings"], section: .advanced, advancedSubsection: .aiChat, icon: "cpu", settingId: "aichat.aichat"),
+        SettingsSearchItem(name: "Ask Mode", subtitle: "Show an Ask/Act toggle in the chat to control tool use", keywords: ["ask", "act", "read only", "mode toggle"], section: .advanced, advancedSubsection: .aiChat, icon: "cpu", settingId: "aichat.askmode"),
+        SettingsSearchItem(name: "CLAUDE.md", subtitle: "Personal instructions loaded into AI chat", keywords: ["claude md", "claude config", "instructions", "view"], section: .advanced, advancedSubsection: .aiChat, icon: "cpu", settingId: "aichat.claudemd"),
+        SettingsSearchItem(name: "Skills", subtitle: "Enable or disable discovered AI skills", keywords: ["skills", "plugins", "abilities", "view"], section: .advanced, advancedSubsection: .aiChat, icon: "cpu", settingId: "aichat.skills"),
+        SettingsSearchItem(name: "Browser Extension", subtitle: "Lets the AI use your Chrome browser with all your logged-in sessions", keywords: ["playwright", "chrome", "browser extension", "browser", "set up", "reconfigure", "token"], section: .advanced, advancedSubsection: .aiChat, icon: "cpu", settingId: "aichat.browserextension"),
+        SettingsSearchItem(name: "Workspace", subtitle: "Set a project directory for AI chat context", keywords: ["workspace", "project", "directory", "folder", "working directory", "claude.md"], section: .advanced, advancedSubsection: .aiChat, icon: "cpu", settingId: "aichat.workspace"),
+        SettingsSearchItem(name: "AI Provider", subtitle: "Choose between Agent SDK and Claude Code for AI chat", keywords: ["provider", "agent sdk", "claude code", "acp", "bridge mode"], section: .advanced, advancedSubsection: .aiChat, icon: "cpu", settingId: "aichat.provider"),
+        SettingsSearchItem(name: "Dev Mode", subtitle: "Developer tools and debugging options", keywords: ["developer", "debug", "dev mode", "development"], section: .advanced, advancedSubsection: .aiChat, icon: "cpu", settingId: "aichat.devmode"),
 
         // Dictionary
         SettingsSearchItem(name: "Dictionary", subtitle: "Custom words to improve transcription accuracy", keywords: ["dictionary", "vocabulary", "transcription", "words", "phrases", "keyterm"], section: .dictionary, advancedSubsection: nil, icon: "character.book.closed", settingId: "dictionary.dictionary"),
@@ -46,16 +46,15 @@ struct SettingsSearchItem: Identifiable {
         SettingsSearchItem(name: "Version Info", subtitle: "Current app version and build number", keywords: ["version", "build", "app version", "build number"], section: .about, advancedSubsection: nil, icon: "info.circle", settingId: "about.version"),
         SettingsSearchItem(name: "Report an Issue", subtitle: "Help us improve Fazm", keywords: ["bug", "feedback", "report", "issue"], section: .about, advancedSubsection: nil, icon: "info.circle", settingId: "about.reportissue"),
 
-        // Advanced subsections
-        SettingsSearchItem(name: "Ask Fazm Floating Bar", subtitle: "Configure shortcuts and floating bar behavior", keywords: ["floating bar", "shortcuts", "push to talk"], section: .advanced, advancedSubsection: .askFazmFloatingBar, icon: "sparkles", settingId: "advanced.askfazm"),
-        SettingsSearchItem(name: "AI Model", subtitle: "Choose the AI model for Ask Fazm conversations", keywords: ["model", "ai", "sonnet", "opus", "claude"], section: .advanced, advancedSubsection: .askFazmFloatingBar, icon: "sparkles", settingId: "advanced.askfazm.model"),
-        SettingsSearchItem(name: "Background Style", subtitle: "Toggle between solid and transparent background", keywords: ["background", "solid", "transparent", "blur"], section: .advanced, advancedSubsection: .askFazmFloatingBar, icon: "sparkles", settingId: "advanced.askfazm.background"),
-        SettingsSearchItem(name: "Draggable Floating Bar", subtitle: "Allow repositioning the floating bar by dragging it", keywords: ["drag", "move", "reposition", "draggable"], section: .advanced, advancedSubsection: .askFazmFloatingBar, icon: "sparkles", settingId: "advanced.askfazm.draggable"),
-        SettingsSearchItem(name: "Ask Fazm Shortcut", subtitle: "Global shortcut to open Ask Fazm from anywhere", keywords: ["shortcut", "hotkey", "keyboard", "global shortcut"], section: .advanced, advancedSubsection: .askFazmFloatingBar, icon: "sparkles", settingId: "advanced.askfazm.shortcut"),
-        SettingsSearchItem(name: "Push to Talk", subtitle: "Hold a key to speak, release to send your question to AI", keywords: ["push to talk", "ptt", "hold to talk", "microphone key"], section: .advanced, advancedSubsection: .askFazmFloatingBar, icon: "sparkles", settingId: "advanced.askfazm.ptt"),
-        SettingsSearchItem(name: "Transcription Mode", subtitle: "Choose how voice input is processed", keywords: ["transcription", "mode", "voice", "dictation"], section: .advanced, advancedSubsection: .askFazmFloatingBar, icon: "sparkles", settingId: "advanced.askfazm.transcriptionmode"),
-        SettingsSearchItem(name: "Double-tap for Locked Mode", subtitle: "Double-tap the push-to-talk key to keep listening hands-free", keywords: ["double tap", "locked mode", "hands free", "listening"], section: .advanced, advancedSubsection: .askFazmFloatingBar, icon: "sparkles", settingId: "advanced.askfazm.doubletap"),
-        SettingsSearchItem(name: "Push-to-Talk Sounds", subtitle: "Play audio feedback when starting and ending voice input", keywords: ["sounds", "audio feedback", "ptt sounds"], section: .advanced, advancedSubsection: .askFazmFloatingBar, icon: "sparkles", settingId: "advanced.askfazm.pttsounds"),
+        // Shortcuts section
+        SettingsSearchItem(name: "AI Model", subtitle: "Choose the AI model for Ask Fazm conversations", keywords: ["model", "ai", "sonnet", "opus", "claude"], section: .shortcuts, advancedSubsection: nil, icon: "keyboard", settingId: "advanced.askfazm.model"),
+        SettingsSearchItem(name: "Background Style", subtitle: "Toggle between solid and transparent background", keywords: ["background", "solid", "transparent", "blur"], section: .general, advancedSubsection: nil, icon: "gearshape", settingId: "general.background"),
+        SettingsSearchItem(name: "Draggable Floating Bar", subtitle: "Allow repositioning the floating bar by dragging it", keywords: ["drag", "move", "reposition", "draggable"], section: .shortcuts, advancedSubsection: nil, icon: "keyboard", settingId: "advanced.askfazm.draggable"),
+        SettingsSearchItem(name: "Ask Fazm Shortcut", subtitle: "Global shortcut to open Ask Fazm from anywhere", keywords: ["shortcut", "hotkey", "keyboard", "global shortcut"], section: .shortcuts, advancedSubsection: nil, icon: "keyboard", settingId: "advanced.askfazm.shortcut"),
+        SettingsSearchItem(name: "Push to Talk", subtitle: "Hold a key to speak, release to send your question to AI", keywords: ["push to talk", "ptt", "hold to talk", "microphone key"], section: .shortcuts, advancedSubsection: nil, icon: "keyboard", settingId: "advanced.askfazm.ptt"),
+        SettingsSearchItem(name: "Transcription Mode", subtitle: "Choose how voice input is processed", keywords: ["transcription", "mode", "voice", "dictation"], section: .shortcuts, advancedSubsection: nil, icon: "keyboard", settingId: "advanced.askfazm.transcriptionmode"),
+        SettingsSearchItem(name: "Double-tap for Locked Mode", subtitle: "Double-tap the push-to-talk key to keep listening hands-free", keywords: ["double tap", "locked mode", "hands free", "listening"], section: .shortcuts, advancedSubsection: nil, icon: "keyboard", settingId: "advanced.askfazm.doubletap"),
+        SettingsSearchItem(name: "Push-to-Talk Sounds", subtitle: "Play audio feedback when starting and ending voice input", keywords: ["sounds", "audio feedback", "ptt sounds"], section: .shortcuts, advancedSubsection: nil, icon: "keyboard", settingId: "advanced.askfazm.pttsounds"),
         SettingsSearchItem(name: "Multiple Chat Sessions", subtitle: "Create separate chat threads", keywords: ["multi chat", "threads"], section: .advanced, advancedSubsection: .preferences, icon: "slider.horizontal.3", settingId: "advanced.preferences.multichat"),
         SettingsSearchItem(name: "Launch at Login", subtitle: "Start Fazm automatically when you log in", keywords: ["startup", "login", "boot"], section: .advanced, advancedSubsection: .preferences, icon: "slider.horizontal.3", settingId: "advanced.preferences.launchatlogin"),
         SettingsSearchItem(name: "Report Issue", subtitle: "Send app logs and report a problem", keywords: ["bug", "feedback", "logs", "report"], section: .advanced, advancedSubsection: .troubleshooting, icon: "wrench.and.screwdriver", settingId: "advanced.troubleshooting.reportissue"),
@@ -119,7 +118,7 @@ struct SettingsSidebar: View {
                                     withAnimation(.easeInOut(duration: 0.15)) {
                                         selectedSection = section
                                         if section == .advanced && selectedAdvancedSubsection == nil {
-                                            selectedAdvancedSubsection = .askFazmFloatingBar
+                                            selectedAdvancedSubsection = .aiChat
                                         }
                                     }
                                 }
@@ -209,7 +208,7 @@ struct SettingsSidebar: View {
                                 if let sub = item.advancedSubsection {
                                     selectedAdvancedSubsection = sub
                                 } else if item.section == .advanced {
-                                    selectedAdvancedSubsection = .askFazmFloatingBar
+                                    selectedAdvancedSubsection = .aiChat
                                 }
                             }
                             searchQuery = ""
@@ -238,7 +237,7 @@ struct SettingsSidebarItem: View {
     private var icon: String {
         switch section {
         case .general: return "gearshape"
-        case .aiChat: return "cpu"
+        case .shortcuts: return "keyboard"
         case .dictionary: return "character.book.closed"
         case .advanced: return "chart.bar"
         case .about: return "info.circle"
@@ -393,7 +392,7 @@ struct SettingHighlightModifier: ViewModifier {
 #Preview {
     SettingsSidebar(
         selectedSection: .constant(.advanced),
-        selectedAdvancedSubsection: .constant(.askFazmFloatingBar),
+        selectedAdvancedSubsection: .constant(.aiChat),
         highlightedSettingId: .constant(nil)
     )
     .preferredColorScheme(.dark)
