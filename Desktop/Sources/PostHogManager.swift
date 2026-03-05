@@ -483,33 +483,6 @@ extension PostHogManager {
         ])
     }
 
-    // MARK: - Rewind Events (Desktop-specific)
-
-    func rewindSearchPerformed(queryLength: Int) {
-        track("Rewind Search Performed", properties: [
-            "query_length": queryLength
-        ])
-    }
-
-    func rewindScreenshotViewed(timestamp: Date) {
-        track("Rewind Screenshot Viewed", properties: [
-            "timestamp": ISO8601DateFormatter().string(from: timestamp)
-        ])
-    }
-
-    func ffmpegResolved(source: String, path: String) {
-        track("FFmpeg Resolved", properties: [
-            "source": source,
-            "path": path
-        ])
-    }
-
-    func rewindTimelineNavigated(direction: String) {
-        track("Rewind Timeline Navigated", properties: [
-            "direction": direction
-        ])
-    }
-
     // MARK: - Proactive Assistant Events (Desktop-specific)
 
     func focusAlertShown(app: String) {
