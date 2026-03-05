@@ -59,7 +59,7 @@ struct SettingsPage: View {
         }
         .onChange(of: selectedSection) { _, newValue in
             if newValue == .advanced && selectedAdvancedSubsection == nil {
-                selectedAdvancedSubsection = .askFazmFloatingBar
+                selectedAdvancedSubsection = .aiChat
             }
         }
     }
@@ -123,20 +123,20 @@ struct SettingsContentView: View {
 
     enum SettingsSection: String, CaseIterable {
         case general = "General"
-        case aiChat = "AI Chat"
+        case shortcuts = "Shortcuts"
         case dictionary = "Dictionary"
         case advanced = "Advanced"
         case about = "About"
     }
 
     enum AdvancedSubsection: String, CaseIterable {
-        case askFazmFloatingBar = "Ask Fazm Floating Bar"
+        case aiChat = "AI Chat"
         case preferences = "Preferences"
         case troubleshooting = "Troubleshooting"
 
         var icon: String {
             switch self {
-            case .askFazmFloatingBar: return "sparkles"
+            case .aiChat: return "cpu"
             case .preferences: return "slider.horizontal.3"
             case .troubleshooting: return "wrench.and.screwdriver"
             }
@@ -167,8 +167,8 @@ struct SettingsContentView: View {
                 switch selectedSection {
                 case .general:
                     generalSection
-                case .aiChat:
-                    aiChatSection
+                case .shortcuts:
+                    shortcutsSection
                 case .dictionary:
                     dictionarySection
                 case .advanced:
@@ -187,7 +187,7 @@ struct SettingsContentView: View {
             showAskFazmBar = FloatingControlBarManager.shared.isVisible
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToFloatingBarSettings)) { _ in
-            selectedSection = .general
+            selectedSection = .shortcuts
         }
     }
 
@@ -359,10 +359,41 @@ struct SettingsContentView: View {
             .onAppear { audioDeviceManager.startLevelMonitoring() }
             .onDisappear { audioDeviceManager.stopLevelMonitoring() }
 
+            // Background Style
+            settingsCard(settingId: "general.background") {
+                HStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Background Style")
+                            .scaledFont(size: 16, weight: .semibold)
+                            .foregroundColor(FazmColors.textPrimary)
+                        Text(ShortcutSettings.shared.solidBackground
+                             ? "Solid dark background"
+                             : "Semi-transparent with blur")
+                            .scaledFont(size: 13)
+                            .foregroundColor(FazmColors.textSecondary)
+                    }
+                    Spacer()
+                    Toggle("", isOn: Binding(
+                        get: { ShortcutSettings.shared.solidBackground },
+                        set: { ShortcutSettings.shared.solidBackground = $0 }
+                    ))
+                        .toggleStyle(.switch)
+                        .tint(FazmColors.purplePrimary)
+                }
+            }
+
         }
     }
 
     @ObservedObject private var fontScaleSettings = FontScaleSettings.shared
+
+    // MARK: - Shortcuts Section
+
+    private var shortcutsSection: some View {
+        VStack(spacing: 20) {
+            ShortcutsSettingsSection(highlightedSettingId: $highlightedSettingId)
+        }
+    }
 
     // MARK: - AI Chat Section
 
@@ -1096,8 +1127,8 @@ struct SettingsContentView: View {
     private var advancedSection: some View {
         Group {
             switch selectedAdvancedSubsection {
-            case .askFazmFloatingBar, .none:
-                askFazmFloatingBarSubsection
+            case .aiChat, .none:
+                aiChatSection
             case .preferences:
                 preferencesSubsection
             case .troubleshooting:
@@ -1107,12 +1138,6 @@ struct SettingsContentView: View {
     }
 
     // MARK: - Advanced Subsections
-
-    private var askFazmFloatingBarSubsection: some View {
-        VStack(spacing: 20) {
-            ShortcutsSettingsSection(highlightedSettingId: $highlightedSettingId)
-        }
-    }
 
     private var preferencesSubsection: some View {
         VStack(spacing: 20) {
