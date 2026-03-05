@@ -321,6 +321,8 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
         removeGlobalClickOutsideMonitor()
         globalClickOutsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             guard let self, self.state.showingAIConversation, !self.suppressClickOutsideDismiss else { return }
+            // Don't collapse while AI is generating a response
+            if self.state.showingAIResponse, self.state.currentAIMessage?.isStreaming == true || self.state.isAILoading { return }
             self.dismissConversationAnimated()
         }
     }
@@ -695,6 +697,9 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
             || eventType == .rightMouseDown
             || eventType == .otherMouseDown
         guard isMouseClick else { return }
+
+        // Don't collapse while AI is generating a response
+        if state.showingAIResponse, state.currentAIMessage?.isStreaming == true || state.isAILoading { return }
 
         dismissConversationAnimated()
     }
