@@ -47,6 +47,8 @@ class PushToTalkManager: ObservableObject {
 
   // Tracks whether PTT opened the chat panel (so we sync transcript to aiInputText)
   private var pttOpenedChat: Bool = false
+  /// Text that was already in the input field before PTT started (for appending)
+  private var preVoiceInputText: String = ""
 
   // Live mode: timeout for waiting on final transcript after CloseStream
   private var liveFinalizationTimeout: DispatchWorkItem?
@@ -209,6 +211,7 @@ class PushToTalkManager: ObservableObject {
 
     // Always open the input panel — same experience whether fresh or mid-conversation
     pttOpenedChat = true
+    preVoiceInputText = barState?.aiInputText.trimmingCharacters(in: .whitespaces) ?? ""
     if barState?.showingAIConversation != true {
       FloatingControlBarManager.shared.openAIInput()
     }
@@ -235,6 +238,7 @@ class PushToTalkManager: ObservableObject {
 
     // Always open the input panel — same experience whether fresh or mid-conversation
     pttOpenedChat = true
+    preVoiceInputText = barState?.aiInputText.trimmingCharacters(in: .whitespaces) ?? ""
     if barState?.showingAIConversation != true {
       FloatingControlBarManager.shared.openAIInput()
     }
@@ -398,7 +402,7 @@ class PushToTalkManager: ObservableObject {
         // Response is showing — use pendingFollowUpText to insert into follow-up field
         barState?.pendingFollowUpText = query
       } else {
-        barState?.aiInputText = query
+        barState?.aiInputText = preVoiceInputText.isEmpty ? query : preVoiceInputText + " " + query
       }
       pttOpenedChat = false
     } else {
@@ -542,7 +546,7 @@ class PushToTalkManager: ObservableObject {
 
     // Sync live transcript directly into the input field
     if pttOpenedChat {
-      barState?.aiInputText = liveText
+      barState?.aiInputText = preVoiceInputText.isEmpty ? liveText : preVoiceInputText + " " + liveText
     }
 
     // In finalizing state, a final segment means Deepgram is done — send immediately
