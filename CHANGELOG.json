@@ -14,7 +14,8 @@
     "Added Resume last chat button to restore dismissed conversations",
     "Removed Mixpanel analytics, Rewind screenshot capture, and ffmpeg \u2014 smaller app, fewer dependencies",
     "Added Dictionary settings tab for custom transcription vocabulary",
-    "Chat no longer collapses when clicking away while AI is streaming a response"
+    "Chat no longer collapses when clicking away while AI is streaming a response",
+    "Fixed floating bar flickering when sending chat messages"
   ],
   "releases": [
     {

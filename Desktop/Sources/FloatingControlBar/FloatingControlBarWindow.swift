@@ -1083,8 +1083,11 @@ class FloatingControlBarManager {
     private func sendAIQuery(_ message: String, barWindow: FloatingControlBarWindow, provider: ChatProvider) async {
         // Capture the last active app's window (not the full desktop)
         let targetPID = self.lastActiveAppPID
-        barWindow.orderOut(nil)
-        try? await Task.sleep(nanoseconds: 150_000_000) // 150ms for window to disappear
+        let needsHideBar = targetPID == 0 // Only hide for full-screen capture
+        if needsHideBar {
+            barWindow.orderOut(nil)
+            try? await Task.sleep(nanoseconds: 150_000_000) // 150ms for window to disappear
+        }
         let screenshotData = await Task.detached { () -> Data? in
             let url: URL?
             if targetPID != 0 {
@@ -1095,7 +1098,9 @@ class FloatingControlBarManager {
             guard let url else { return nil }
             return try? Data(contentsOf: url)
         }.value
-        barWindow.makeKeyAndOrderFront(nil)
+        if needsHideBar {
+            barWindow.makeKeyAndOrderFront(nil)
+        }
 
         AnalyticsManager.shared.floatingBarQuerySent(messageLength: message.count, hasScreenshot: screenshotData != nil)
 
