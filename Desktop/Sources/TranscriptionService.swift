@@ -4,6 +4,32 @@ import Foundation
 /// Streams audio over WebSocket and receives transcript segments
 class TranscriptionService {
 
+    /// Common find-and-replace rules applied by Deepgram's `replace` parameter.
+    /// Format: "spoken form" → "written form"
+    static let defaultReplacements: [(find: String, replace: String)] = [
+        // Domains
+        ("dot com", ".com"),
+        ("dot org", ".org"),
+        ("dot net", ".net"),
+        ("dot io", ".io"),
+        ("dot ai", ".ai"),
+        ("dot dev", ".dev"),
+        ("dot app", ".app"),
+        ("dot co", ".co"),
+        ("dot me", ".me"),
+        ("dot gg", ".gg"),
+        // Email / URL
+        ("at sign", "@"),
+        // Programming
+        ("dot json", ".json"),
+        ("dot js", ".js"),
+        ("dot ts", ".ts"),
+        ("dot py", ".py"),
+        ("dot swift", ".swift"),
+        ("dot css", ".css"),
+        ("dot html", ".html"),
+    ]
+
     // MARK: - Types
 
     /// Transcript segment from DeepGram
@@ -259,6 +285,11 @@ class TranscriptionService {
         // Add keyterm parameters for custom vocabulary (Nova-3 uses "keyterm" not "keywords")
         for term in vocabulary {
             queryItems.append(URLQueryItem(name: "keyterm", value: term))
+        }
+
+        // Add find-and-replace rules for common patterns (URLs, emails, file extensions)
+        for rule in Self.defaultReplacements {
+            queryItems.append(URLQueryItem(name: "replace", value: "\(rule.find):\(rule.replace)"))
         }
 
         components.queryItems = queryItems
@@ -590,6 +621,11 @@ extension TranscriptionService {
 
         for term in vocabulary {
             queryItems.append(URLQueryItem(name: "keyterm", value: term))
+        }
+
+        // Add find-and-replace rules for common patterns (URLs, emails, file extensions)
+        for rule in defaultReplacements {
+            queryItems.append(URLQueryItem(name: "replace", value: "\(rule.find):\(rule.replace)"))
         }
 
         components.queryItems = queryItems
