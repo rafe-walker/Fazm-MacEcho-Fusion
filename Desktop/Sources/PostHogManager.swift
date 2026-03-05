@@ -10,7 +10,7 @@ class PostHogManager {
     private var isInitialized = false
 
     // PostHog configuration
-    private let apiKey = "phc_z3qUFhGUgYIOMYnfxVSrLmYISQvbgph8iREQv3sez3Y"
+    private let apiKey = "phc_TWwTa7D5GcjE4PprY55tJVfPKBC7kmLGiFUDZxBbYRQ"
     private let host = "https://us.i.posthog.com"
 
     private init() {}
