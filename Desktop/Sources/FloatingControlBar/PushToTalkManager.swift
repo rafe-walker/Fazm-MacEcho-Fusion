@@ -47,6 +47,8 @@ class PushToTalkManager: ObservableObject {
 
   // Tracks whether PTT opened the chat panel (so we sync transcript to aiInputText)
   private var pttOpenedChat: Bool = false
+  /// True when the chat was already visible before this PTT session started.
+  private var chatWasOpenBeforePTT: Bool = false
   /// Text that was already in the input field before PTT started (for appending)
   private var preVoiceInputText: String = ""
 
@@ -212,10 +214,11 @@ class PushToTalkManager: ObservableObject {
       sound?.play()
     }
 
-    // Always open the input panel — same experience whether fresh or mid-conversation
+    // Track whether PTT actually opened the chat (vs it was already open)
+    chatWasOpenBeforePTT = barState?.showingAIConversation == true
     pttOpenedChat = true
     preVoiceInputText = barState?.aiInputText.trimmingCharacters(in: .whitespaces) ?? ""
-    if barState?.showingAIConversation != true {
+    if !chatWasOpenBeforePTT {
       FloatingControlBarManager.shared.openAIInput()
     }
 
@@ -239,10 +242,11 @@ class PushToTalkManager: ObservableObject {
       sound?.play()
     }
 
-    // Always open the input panel — same experience whether fresh or mid-conversation
+    // Track whether PTT actually opened the chat (vs it was already open)
+    chatWasOpenBeforePTT = barState?.showingAIConversation == true
     pttOpenedChat = true
     preVoiceInputText = barState?.aiInputText.trimmingCharacters(in: .whitespaces) ?? ""
-    if barState?.showingAIConversation != true {
+    if !chatWasOpenBeforePTT {
       FloatingControlBarManager.shared.openAIInput()
     }
 
@@ -389,8 +393,8 @@ class PushToTalkManager: ObservableObject {
 
     guard hasQuery else {
       log("PushToTalkManager: no transcript to send")
-      if wasPttOpenedChat {
-        // PTT opened the chat but no transcript — close it
+      if wasPttOpenedChat && !chatWasOpenBeforePTT {
+        // PTT opened the chat but no transcript — close it only if PTT opened it
         pttOpenedChat = false
         FloatingControlBarManager.shared.closeAIConversation()
       }

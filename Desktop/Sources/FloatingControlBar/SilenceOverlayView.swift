@@ -36,36 +36,49 @@ struct SilenceOverlayView: View {
                 .buttonStyle(.plain)
             }
 
-            if !deviceManager.devices.isEmpty {
-                Menu {
-                    Button("System Default") {
-                        deviceManager.selectedDeviceUID = nil
+            // Mic picker using MenuButton-style Menu
+            Menu {
+                Button {
+                    deviceManager.selectedDeviceUID = nil
+                } label: {
+                    if deviceManager.selectedDeviceUID == nil {
+                        Label("System Default", systemImage: "checkmark")
+                    } else {
+                        Text("System Default")
                     }
-                    Divider()
-                    ForEach(deviceManager.devices) { device in
-                        Button(device.name) {
-                            deviceManager.selectedDeviceUID = device.uid
+                }
+                Divider()
+                ForEach(deviceManager.devices) { device in
+                    Button {
+                        deviceManager.selectedDeviceUID = device.uid
+                    } label: {
+                        if deviceManager.selectedDeviceUID == device.uid {
+                            Label(device.name, systemImage: "checkmark")
+                        } else {
+                            Text(device.name)
                         }
                     }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "mic.fill")
-                            .font(.system(size: 10))
-                        Text(selectedDeviceName)
-                            .scaledFont(size: 12)
-                        Spacer()
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 9))
-                            .foregroundColor(.white.opacity(0.5))
-                    }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 6)
-                    .background(Color.white.opacity(0.1))
-                    .cornerRadius(8)
                 }
-                .menuStyle(.borderlessButton)
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 10))
+                    Text(selectedDeviceName)
+                        .scaledFont(size: 12)
+                        .lineLimit(1)
+                    Spacer()
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 9))
+                        .foregroundColor(.white.opacity(0.5))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(Color.white.opacity(0.1))
+                .cornerRadius(8)
             }
+            .menuStyle(.borderlessButton)
+            .fixedSize(horizontal: false, vertical: true)
 
             AudioLevelBarsSettingsView(level: deviceManager.currentAudioLevel)
                 .frame(maxWidth: .infinity, alignment: .leading)
