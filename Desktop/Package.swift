@@ -7,7 +7,6 @@ let package = Package(
         .macOS("14.0")
     ],
     dependencies: [
-        .package(url: "https://github.com/mixpanel/mixpanel-swift.git", from: "4.0.0"),
         .package(url: "https://github.com/PostHog/posthog-ios.git", from: "3.0.0"),
         .package(url: "https://github.com/getsentry/sentry-cocoa.git", from: "8.0.0"),
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "6.24.0"),
@@ -24,7 +23,6 @@ let package = Package(
             name: "Fazm",
             dependencies: [
                 "ObjCExceptionCatcher",
-                .product(name: "Mixpanel", package: "mixpanel-swift"),
                 .product(name: "PostHog", package: "posthog-ios"),
                 .product(name: "Sentry", package: "sentry-cocoa"),
                 .product(name: "GRDB", package: "GRDB.swift"),
