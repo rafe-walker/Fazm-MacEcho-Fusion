@@ -522,6 +522,8 @@ class ChatProvider: ObservableObject {
                     Task { @MainActor in
                         self?.isClaudeAuthRequired = false
                         self?.isClaudeConnected = true
+                        // Retry any query that was interrupted by the auth flow
+                        self?.retryPendingMessage()
                     }
                 },
                 onAuthTimeout: { [weak self] reason in
@@ -805,7 +807,9 @@ class ChatProvider: ObservableObject {
                     Task { @MainActor [weak self] in
                         self?.isClaudeAuthRequired = false
                         self?.claudeAuthTimedOut = false
-                        self?.checkClaudeConnectionStatus()
+                        self?.isClaudeConnected = true
+                        // Retry any query that was interrupted by the auth flow
+                        self?.retryPendingMessage()
                     }
                 },
                 onAuthTimeout: { [weak self] reason in
