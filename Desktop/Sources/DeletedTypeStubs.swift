@@ -388,7 +388,7 @@ class APIClient {
     }
 
     /// Fetch total LLM cost for the current user from Firestore.
-    /// Sums desktop_chat.cost_usd across all daily llm_usage documents.
+    /// Sums desktop_chat_builtin.cost_usd across all daily llm_usage documents.
     func fetchTotalBuiltinCost() async -> Double? {
         guard let uid = AuthService.shared.userId else {
             log("APIClient: fetchTotalBuiltinCost skipped — not signed in")
@@ -430,7 +430,7 @@ class APIClient {
             var total: Double = 0
             for entry in results {
                 if let fields = (entry["document"] as? [String: Any])?["fields"] as? [String: Any],
-                   let desktopChat = (fields["desktop_chat"] as? [String: Any])?["mapValue"] as? [String: Any],
+                   let desktopChat = (fields["desktop_chat_builtin"] as? [String: Any])?["mapValue"] as? [String: Any],
                    let chatFields = desktopChat["fields"] as? [String: Any],
                    let costField = chatFields["cost_usd"] as? [String: Any] {
                     if let doubleVal = costField["doubleValue"] as? Double {
