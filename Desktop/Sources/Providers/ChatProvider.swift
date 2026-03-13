@@ -2391,9 +2391,7 @@ class ChatProvider: ObservableObject {
                 onTextBlockBoundary: textBlockBoundaryHandler,
                 onToolResultDisplay: toolResultDisplayHandler,
                 onAuthRequired: { [weak self] methods, authUrl in
-                    log("ChatProvider: per-query onAuthRequired fired (authUrl=\(authUrl != nil ? "present" : "nil"))")
                     Task { @MainActor [weak self] in
-                        log("ChatProvider: setting isClaudeAuthRequired=true on MainActor (authUrl=\(authUrl != nil ? "present" : "nil"))")
                         self?.claudeAuthMethods = methods
                         self?.claudeAuthUrl = authUrl
                         self?.isClaudeAuthRequired = true
