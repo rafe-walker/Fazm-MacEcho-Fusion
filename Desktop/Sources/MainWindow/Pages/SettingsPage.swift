@@ -747,8 +747,17 @@ struct SettingsContentView: View {
 
                                         Button("View") {
                                             fileViewerTitle = "\(skill.name)/SKILL.md"
-                                            fileViewerContent = (try? String(contentsOfFile: skill.path, encoding: .utf8)) ?? "Unable to read file"
+                                            fileViewerContent = ""
+                                            fileViewerLoading = true
                                             showFileViewer = true
+                                            let path = skill.path
+                                            DispatchQueue.global(qos: .userInitiated).async {
+                                                let content = (try? String(contentsOfFile: path, encoding: .utf8)) ?? "Unable to read file"
+                                                DispatchQueue.main.async {
+                                                    fileViewerContent = content
+                                                    fileViewerLoading = false
+                                                }
+                                            }
                                         }
                                         .buttonStyle(.bordered)
                                         .controlSize(.mini)
@@ -959,13 +968,21 @@ struct SettingsContentView: View {
             Divider().opacity(0.3)
 
             // Content
-            ScrollView {
-                Text(fileViewerContent)
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundColor(FazmColors.textSecondary)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(16)
+            if fileViewerLoading {
+                Spacer()
+                ProgressView()
+                    .progressViewStyle(.circular)
+                    .controlSize(.small)
+                Spacer()
+            } else {
+                ScrollView {
+                    Text(fileViewerContent)
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundColor(FazmColors.textSecondary)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                }
             }
         }
         .frame(width: 600, height: 500)
