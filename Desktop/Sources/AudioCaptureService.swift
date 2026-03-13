@@ -22,6 +22,11 @@ class AudioCaptureService: @unchecked Sendable {
         case permissionDenied
         case converterCreationFailed
 
+        var isNoInput: Bool {
+            if case .noInputAvailable = self { return true }
+            return false
+        }
+
         var errorDescription: String? {
             switch self {
             case .noInputAvailable:
