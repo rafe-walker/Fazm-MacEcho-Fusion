@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import Sentry
+import MachO
 
 /// Monitors system resources (memory, CPU, disk) and reports to Sentry
 @MainActor
@@ -195,6 +196,9 @@ class ResourceMonitor {
             autoRestartTriggered = true
             log("ResourceMonitor: EXTREME memory \(snapshot.memoryFootprintMB)MB — auto-restarting to prevent system degradation")
 
+            // Capture enhanced diagnostics before auto-restart
+            collectEnhancedDiagnostics(snapshot: snapshot)
+
             SentrySDK.capture(message: "App Auto-Restarting Due to Extreme Memory") { scope in
                 scope.setLevel(.fatal)
                 scope.setTag(value: "auto_restart", key: "resource_alert")
@@ -230,6 +234,9 @@ class ResourceMonitor {
                 Task {
                     await logComponentDiagnostics(snapshot: snapshot)
                 }
+
+                // Collect enhanced diagnostics (per-thread CPU, malloc zones, VM regions)
+                collectEnhancedDiagnostics(snapshot: snapshot)
 
                 // Attempt to free memory by flushing heavy components
                 triggerMemoryRemediation()
@@ -344,6 +351,164 @@ class ResourceMonitor {
             breadcrumb.data = [
                 "memory_footprint_mb": memoryBefore,
                 "threshold_mb": memoryCriticalThreshold
+            ]
+            SentrySDK.addBreadcrumb(breadcrumb)
+        }
+    }
+
+    // MARK: - Enhanced Diagnostics (only at critical threshold)
+
+    /// Collect per-thread CPU usage to identify which thread is burning CPU.
+    /// Only called at critical threshold to avoid overhead.
+    private func collectPerThreadCPUDiagnostics() -> [String: Any] {
+        var threadList: thread_act_array_t?
+        var threadCount: mach_msg_type_number_t = 0
+
+        guard task_threads(mach_task_self_, &threadList, &threadCount) == KERN_SUCCESS,
+              let threads = threadList else {
+            return ["error": "failed to get threads"]
+        }
+
+        defer {
+            vm_deallocate(mach_task_self_, vm_address_t(bitPattern: threads), vm_size_t(threadCount) * vm_size_t(MemoryLayout<thread_t>.size))
+        }
+
+        var hotThreads: [(name: String, cpu: Double, userTime: Double, systemTime: Double)] = []
+
+        for i in 0..<Int(threadCount) {
+            // Get CPU usage
+            var basicInfo = thread_basic_info()
+            var basicCount = mach_msg_type_number_t(MemoryLayout<thread_basic_info>.size / MemoryLayout<natural_t>.size)
+            let basicResult = withUnsafeMutablePointer(to: &basicInfo) {
+                $0.withMemoryRebound(to: integer_t.self, capacity: Int(basicCount)) {
+                    thread_info(threads[i], thread_flavor_t(THREAD_BASIC_INFO), $0, &basicCount)
+                }
+            }
+
+            guard basicResult == KERN_SUCCESS && (basicInfo.flags & TH_FLAGS_IDLE) == 0 else { continue }
+
+            let cpuPercent = Double(basicInfo.cpu_usage) / Double(TH_USAGE_SCALE) * 100.0
+            let userTimeSec = Double(basicInfo.user_time.seconds) + Double(basicInfo.user_time.microseconds) / 1_000_000.0
+            let systemTimeSec = Double(basicInfo.system_time.seconds) + Double(basicInfo.system_time.microseconds) / 1_000_000.0
+
+            // Get thread name via extended info
+            var extInfo = thread_extended_info()
+            var extCount = mach_msg_type_number_t(MemoryLayout<thread_extended_info>.size / MemoryLayout<natural_t>.size)
+            var threadName = "thread-\(i)"
+            let extResult = withUnsafeMutablePointer(to: &extInfo) {
+                $0.withMemoryRebound(to: integer_t.self, capacity: Int(extCount)) {
+                    thread_info(threads[i], thread_flavor_t(THREAD_EXTENDED_INFO), $0, &extCount)
+                }
+            }
+            if extResult == KERN_SUCCESS {
+                let name = withUnsafePointer(to: extInfo.pth_name) {
+                    $0.withMemoryRebound(to: CChar.self, capacity: 64) {
+                        String(cString: $0)
+                    }
+                }
+                if !name.isEmpty {
+                    threadName = name
+                }
+            }
+
+            if cpuPercent > 1.0 { // Only track threads using >1% CPU
+                hotThreads.append((name: threadName, cpu: cpuPercent, userTime: userTimeSec, systemTime: systemTimeSec))
+            }
+        }
+
+        // Sort by CPU usage descending
+        hotThreads.sort { $0.cpu > $1.cpu }
+
+        var result: [String: Any] = ["total_threads": Int(threadCount)]
+        var threadDetails: [[String: Any]] = []
+        for (idx, t) in hotThreads.prefix(5).enumerated() {
+            threadDetails.append([
+                "rank": idx + 1,
+                "name": t.name,
+                "cpu_percent": String(format: "%.1f", t.cpu),
+                "user_time_sec": String(format: "%.1f", t.userTime),
+                "system_time_sec": String(format: "%.1f", t.systemTime)
+            ])
+            log("ResourceMonitor: HOT THREAD #\(idx + 1): \(t.name) — CPU: \(String(format: "%.1f", t.cpu))%, user: \(String(format: "%.1f", t.userTime))s, sys: \(String(format: "%.1f", t.systemTime))s")
+        }
+        result["hot_threads"] = threadDetails
+        return result
+    }
+
+    /// Collect malloc zone statistics to see heap vs VM allocations.
+    private func collectMallocZoneDiagnostics() -> [String: Any] {
+        var stats = malloc_statistics_t()
+        malloc_zone_statistics(nil, &stats) // nil = default zone aggregate
+
+        let result: [String: Any] = [
+            "malloc_size_in_use_mb": stats.size_in_use / (1024 * 1024),
+            "malloc_size_allocated_mb": stats.size_allocated / (1024 * 1024),
+            "malloc_blocks_in_use": stats.blocks_in_use,
+            "malloc_max_size_in_use_mb": stats.max_size_in_use / (1024 * 1024)
+        ]
+
+        log("ResourceMonitor: MALLOC ZONES: in_use=\(stats.size_in_use / (1024 * 1024))MB, allocated=\(stats.size_allocated / (1024 * 1024))MB, blocks=\(stats.blocks_in_use), max=\(stats.max_size_in_use / (1024 * 1024))MB")
+        return result
+    }
+
+    /// Collect VM region breakdown from task_vm_info.
+    private func collectVMRegionDiagnostics() -> [String: Any] {
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info>.size) / 4
+
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+            }
+        }
+
+        guard result == KERN_SUCCESS else {
+            return ["error": "task_vm_info failed"]
+        }
+
+        let toMB: (UInt64) -> UInt64 = { $0 / (1024 * 1024) }
+        let toMBSigned: (Int64) -> Int64 = { $0 / (1024 * 1024) }
+
+        let diagnostics: [String: Any] = [
+            "phys_footprint_mb": toMB(UInt64(info.phys_footprint)),
+            "internal_mb": toMBSigned(Int64(info.internal)),
+            "external_mb": toMBSigned(Int64(info.external)),
+            "compressed_mb": toMB(UInt64(info.compressed)),
+            "purgeable_volatile_mb": toMB(UInt64(info.purgeable_volatile_pmap)),
+            "virtual_size_mb": toMB(UInt64(info.virtual_size)),
+            "resident_size_mb": toMB(UInt64(info.resident_size)),
+            "reusable_mb": toMBSigned(Int64(info.reusable)),
+        ]
+
+        log("ResourceMonitor: VM REGIONS: phys=\(toMB(UInt64(info.phys_footprint)))MB, internal=\(toMBSigned(Int64(info.internal)))MB, external=\(toMBSigned(Int64(info.external)))MB, compressed=\(toMB(UInt64(info.compressed)))MB, virtual=\(toMB(UInt64(info.virtual_size)))MB, resident=\(toMB(UInt64(info.resident_size)))MB, reusable=\(toMBSigned(Int64(info.reusable)))MB")
+        return diagnostics
+    }
+
+    /// Collect all enhanced diagnostics and send to Sentry.
+    /// Only called at critical memory threshold to avoid overhead.
+    private func collectEnhancedDiagnostics(snapshot: ResourceSnapshot) {
+        log("ResourceMonitor: === ENHANCED DIAGNOSTICS START (memory: \(snapshot.memoryFootprintMB)MB) ===")
+
+        let threadDiag = collectPerThreadCPUDiagnostics()
+        let mallocDiag = collectMallocZoneDiagnostics()
+        let vmDiag = collectVMRegionDiagnostics()
+
+        log("ResourceMonitor: === ENHANCED DIAGNOSTICS END ===")
+
+        // Send to Sentry as breadcrumbs and context
+        if !isDevBuild {
+            SentrySDK.configureScope { scope in
+                scope.setContext(value: threadDiag, key: "hot_threads")
+                scope.setContext(value: mallocDiag, key: "malloc_zones")
+                scope.setContext(value: vmDiag, key: "vm_regions")
+            }
+
+            let breadcrumb = Breadcrumb(level: .error, category: "enhanced_diagnostics")
+            breadcrumb.message = "Enhanced diagnostics at \(snapshot.memoryFootprintMB)MB"
+            breadcrumb.data = [
+                "hot_threads": threadDiag,
+                "malloc_zones": mallocDiag,
+                "vm_regions": vmDiag
             ]
             SentrySDK.addBreadcrumb(breadcrumb)
         }
