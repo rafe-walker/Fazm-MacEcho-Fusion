@@ -149,6 +149,7 @@ struct OnboardingChatView: View {
     @State private var inputText: String = ""
     @State private var hasStarted: Bool = false
     @State private var onboardingCompleted: Bool = false
+    @State private var quickReplyQuestion: String = ""
     @State private var quickReplyOptions: [String] = []
     @State private var isGrantingPermission: Bool = false
     @State private var pendingPermissionType: String? = nil  // e.g. "microphone" — waiting for user to grant
@@ -226,6 +227,19 @@ struct OnboardingChatView: View {
                             if let grantOption = quickReplyOptions.first(where: { isGrantButton($0) }),
                                let permType = permissionType(from: grantOption) {
                                 OnboardingPermissionImage(permissionType: permType)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.leading, 44)
+                            }
+
+                            // Show the question text from ask_followup above the buttons
+                            if !quickReplyQuestion.isEmpty {
+                                Text(quickReplyQuestion)
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.white.opacity(0.9))
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 10)
+                                    .background(FazmColors.backgroundSecondary)
+                                    .cornerRadius(18)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(.leading, 44)
                             }
@@ -508,7 +522,8 @@ struct OnboardingChatView: View {
         ChatToolExecutor.onCompleteOnboarding = {
             onboardingCompleted = true
         }
-        ChatToolExecutor.onQuickReplyOptions = { options in
+        ChatToolExecutor.onQuickReplyOptions = { question, options in
+            quickReplyQuestion = question
             quickReplyOptions = options
         }
         ChatToolExecutor.onKnowledgeGraphUpdated = { [weak graphViewModel] in
@@ -638,6 +653,7 @@ struct OnboardingChatView: View {
         inputText = ""
 
         // Clear quick replies when user types their own message
+        quickReplyQuestion = ""
         quickReplyOptions = []
 
         Task {
@@ -666,6 +682,7 @@ struct OnboardingChatView: View {
 
     /// Handle quick reply button tap — triggers permission if applicable, then sends as user message
     private func handleQuickReply(_ option: String) {
+        quickReplyQuestion = ""
         quickReplyOptions = []
 
         if let permType = permissionType(from: option) {
