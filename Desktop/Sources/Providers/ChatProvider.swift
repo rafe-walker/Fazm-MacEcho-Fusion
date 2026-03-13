@@ -2633,14 +2633,20 @@ class ChatProvider: ObservableObject {
             if let bridgeError = error as? BridgeError, case .stopped = bridgeError {
                 // User stopped — no error to show
             } else if let bridgeError = error as? BridgeError, case .creditExhausted = bridgeError {
-                // Built-in credits exhausted — auto-switch to personal mode
-                log("ChatProvider: credit exhausted, auto-switching to personal mode")
+                // Credits or rate limit exhausted
+                log("ChatProvider: credit/rate limit exhausted in \(bridgeMode) mode")
                 AnalyticsManager.shared.creditExhausted(previousMode: bridgeMode)
                 if bridgeMode == "builtin" {
+                    // Built-in credits exhausted — auto-switch to personal mode
                     await switchBridgeMode(to: "personal")
+                    showCreditExhaustedAlert = true
+                    errorMessage = bridgeError.errorDescription
+                } else {
+                    // Already in personal mode — user hit their own Claude rate limit
+                    // Prompt them to sign in (they may not have connected their account yet)
+                    isClaudeAuthRequired = true
+                    errorMessage = nil
                 }
-                showCreditExhaustedAlert = true
-                errorMessage = bridgeError.errorDescription
             } else if bridgeMode == "builtin",
                       let bridgeError = error as? BridgeError,
                       case .agentError(let msg) = bridgeError,
