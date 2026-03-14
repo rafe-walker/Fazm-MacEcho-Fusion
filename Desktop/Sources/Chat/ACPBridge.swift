@@ -567,7 +567,7 @@ actor ACPBridge {
 
       case .creditExhausted(let message):
         log("ACPBridge: credit exhausted: \(message)")
-        throw BridgeError.creditExhausted
+        throw BridgeError.creditExhausted(message)
 
       case .statusChange(let status):
         onStatusEvent(status == "compacting" ? .compacting(true) : .compacting(false))
@@ -1015,7 +1015,7 @@ enum BridgeError: LocalizedError {
   case processExited
   case outOfMemory
   case stopped
-  case creditExhausted
+  case creditExhausted(String)
   case agentError(String)
 
   var errorDescription: String? {
@@ -1036,7 +1036,12 @@ enum BridgeError: LocalizedError {
       return "Not enough memory for AI chat. Close some apps and try again."
     case .stopped:
       return "Response stopped."
-    case .creditExhausted:
+    case .creditExhausted(let message):
+      // Extract "resets X" clause from the error message if present (e.g. "resets 11pm (America/Santiago)")
+      if let range = message.range(of: #"resets\s+\S.*"#, options: .regularExpression) {
+        let resets = String(message[range])
+        return "You've hit Claude's usage limit (\(resets)). Your quota will reset shortly — try again then."
+      }
       return "Built-in credits are exhausted. Please switch to your personal Claude account in Settings."
     case .agentError(let msg):
       let lower = msg.lowercased()
