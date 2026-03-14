@@ -163,7 +163,7 @@ private struct ClaudeAuthWindowContent: View {
                 chatProvider.startClaudeAuth()
             },
             onCancel: {
-                chatProvider.isClaudeAuthRequired = false
+                chatProvider.cancelClaudeAuth()
                 onDismiss()
             },
             hasTimedOut: chatProvider.claudeAuthTimedOut,
