@@ -897,41 +897,23 @@ class ChatProvider: ObservableObject {
         }
     }
 
-    /// Check whether the user has an active Claude Code CLI session by running `claude auth status`
+    /// Check whether the user has Claude OAuth credentials stored in the macOS Keychain.
+    /// Our OAuth flow stores tokens under the "Claude Code-credentials" service name.
     func checkClaudeConnectionStatus() {
         Task.detached { [weak self] in
-            let home = NSHomeDirectory()
-            var candidates = [
-                "\(home)/.claude/bin/claude",
-                "/usr/local/bin/claude",
-                "/opt/homebrew/bin/claude",
-            ]
-            // Check NVM node versions (claude is an npm global)
-            let nvmDir = "\(home)/.nvm/versions/node"
-            if let versions = try? FileManager.default.contentsOfDirectory(atPath: nvmDir) {
-                for v in versions.sorted(by: { $0.compare($1, options: .numeric) == .orderedDescending }) {
-                    candidates.append("\(nvmDir)/\(v)/bin/claude")
-                }
-            }
-            guard let claudePath = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) else {
-                log("ChatProvider: Claude CLI not found")
-                await MainActor.run { self?.isClaudeConnected = false }
-                return
-            }
-
             let proc = Process()
-            proc.executableURL = URL(fileURLWithPath: claudePath)
-            proc.arguments = ["auth", "status"]
+            proc.executableURL = URL(fileURLWithPath: "/usr/bin/security")
+            proc.arguments = ["find-generic-password", "-s", "Claude Code-credentials"]
             proc.standardOutput = FileHandle.nullDevice
             proc.standardError = FileHandle.nullDevice
             do {
                 try proc.run()
                 proc.waitUntilExit()
-                let authenticated = proc.terminationStatus == 0
-                log("ChatProvider: claude auth status → \(authenticated ? "authenticated" : "not authenticated")")
-                await MainActor.run { self?.isClaudeConnected = authenticated }
+                let hasCredentials = proc.terminationStatus == 0
+                log("ChatProvider: Keychain Claude credentials → \(hasCredentials ? "found" : "not found")")
+                await MainActor.run { self?.isClaudeConnected = hasCredentials }
             } catch {
-                logError("ChatProvider: Failed to run claude auth status", error: error)
+                logError("ChatProvider: Failed to check Keychain for Claude credentials", error: error)
                 await MainActor.run { self?.isClaudeConnected = false }
             }
         }
