@@ -1316,6 +1316,13 @@ class FloatingControlBarManager {
 
         log("FloatingControlBarManager: Retrying pending query via floating bar (with session resume)")
 
+        // Archive the interrupted exchange to chat history before clearing,
+        // so the user's original query and any partial AI response remain visible.
+        let currentQuery = window.state.displayedQuery
+        if let currentMessage = window.state.currentAIMessage, !currentQuery.isEmpty {
+            window.state.chatHistory.append(FloatingChatExchange(question: currentQuery, aiMessage: currentMessage))
+        }
+
         // Reset streaming state but keep chat history — the session will be resumed
         chatCancellable?.cancel()
         chatCancellable = nil
@@ -1471,6 +1478,10 @@ class FloatingControlBarManager {
             } else {
                 barWindow.state.currentAIMessage = ChatMessage(text: "⚠️ \(errorText)", sender: .ai)
             }
+        } else if provider.needsBrowserExtensionSetup || provider.pendingRetryMessage != nil {
+            // Browser extension setup interrupted the query — retry is pending,
+            // don't show a spurious error message.
+            log("FloatingControlBarManager: Suppressing error message — browser setup retry pending")
         } else if barWindow.state.currentAIMessage == nil || barWindow.state.aiResponseText.isEmpty {
             // No error message and no response — something else went wrong
             barWindow.state.currentAIMessage = ChatMessage(text: "Failed to get a response. Please try again.", sender: .ai)
