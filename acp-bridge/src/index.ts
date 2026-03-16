@@ -959,7 +959,7 @@ async function handleQuery(msg: QueryMessage): Promise<void> {
         _meta?: { costUsd?: number };
       };
 
-      logErr(`Prompt completed: stopReason=${promptResult.stopReason}, keys=${Object.keys(promptResult).join(",")}, usage=${JSON.stringify(promptResult.usage)}, meta=${JSON.stringify(promptResult._meta)}`);
+      logErr(`Prompt completed: stopReason=${promptResult.stopReason}`);
 
       // Increment image turn counter so we know when to stop including screenshots.
       // Image turn counting removed — screenshots are now read by the model via Read tool
