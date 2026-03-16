@@ -442,9 +442,8 @@ actor ACPBridge {
     if let resume = resume {
       queryDict["resume"] = resume
     }
-    if let imagePath = imagePath {
-      queryDict["imagePath"] = imagePath.path
-    }
+    // imagePath is no longer sent — screenshot path is appended to prompt text
+    // so the model can read it via the Read tool if needed
 
     let jsonData = try JSONSerialization.data(withJSONObject: queryDict)
     guard let jsonString = String(data: jsonData, encoding: .utf8) else {
