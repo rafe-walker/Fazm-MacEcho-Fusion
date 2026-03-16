@@ -126,14 +126,20 @@ class TranscriptionService {
     ///   - apiKey: DeepGram API key (defaults to DEEPGRAM_API_KEY environment variable)
     ///   - language: Language code for transcription (e.g., "en", "uk", "ru", "multi" for auto-detect)
     ///   - vocabulary: Custom vocabulary/keyterms to improve transcription accuracy (Nova-3 limit: 500 tokens total)
-    init(apiKey: String? = nil, language: String = "en", vocabulary: [String] = [], channels: Int = 2) throws {
-        guard let key = apiKey
-            ?? (getenv("DEEPGRAM_API_KEY").flatMap { String(validatingUTF8: $0) })
-            ?? { let k = KeyService.shared.deepgramAPIKey; return (k ?? "").isEmpty ? nil : k }()
-        else {
-            throw TranscriptionError.missingAPIKey
+    /// Resolve the Deepgram API key, waiting for KeyService if needed.
+    static func resolveDeepgramKey(_ explicitKey: String? = nil) async throws -> String {
+        if let key = explicitKey, !key.isEmpty { return key }
+        if let envKey = getenv("DEEPGRAM_API_KEY").flatMap({ String(validatingUTF8: $0) }), !envKey.isEmpty {
+            return envKey
         }
-        self.apiKey = key
+        // Wait for backend key fetch to complete (up to 10s)
+        await KeyService.shared.ensureKeys()
+        if let k = KeyService.shared.deepgramAPIKey, !k.isEmpty { return k }
+        throw TranscriptionError.missingAPIKey
+    }
+
+    init(apiKey: String, language: String = "en", vocabulary: [String] = [], channels: Int = 2) {
+        self.apiKey = apiKey
         self.language = language
         self.vocabulary = vocabulary
         self.channels = channels
@@ -547,12 +553,7 @@ extension TranscriptionService {
         vocabulary: [String] = [],
         apiKey: String? = nil
     ) async throws -> String? {
-        guard let key = apiKey
-            ?? (getenv("DEEPGRAM_API_KEY").flatMap { String(validatingUTF8: $0) })
-            ?? { let k = KeyService.shared.deepgramAPIKey; return (k ?? "").isEmpty ? nil : k }()
-        else {
-            throw TranscriptionError.missingAPIKey
-        }
+        let key = try await resolveDeepgramKey(apiKey)
 
         var components = URLComponents(string: "https://api.deepgram.com/v1/listen")!
         components.queryItems = [

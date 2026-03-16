@@ -600,37 +600,41 @@ class PushToTalkManager: ObservableObject {
       // Live mode: start mic capture and stream to Deepgram
       startMicCapture()
 
-      do {
-        let language = AssistantSettings.shared.effectiveTranscriptionLanguage
-        let service = try TranscriptionService(language: language, vocabulary: AssistantSettings.shared.effectiveVocabulary, channels: 1)
-        transcriptionService = service
+      Task { @MainActor [weak self] in
+        guard let self else { return }
+        do {
+          let language = AssistantSettings.shared.effectiveTranscriptionLanguage
+          let apiKey = try await TranscriptionService.resolveDeepgramKey()
+          let service = TranscriptionService(apiKey: apiKey, language: language, vocabulary: AssistantSettings.shared.effectiveVocabulary, channels: 1)
+          self.transcriptionService = service
 
-        service.start(
-          onTranscript: { [weak self] segment in
-            Task { @MainActor in
-              self?.handleTranscript(segment)
+          service.start(
+            onTranscript: { [weak self] segment in
+              Task { @MainActor in
+                self?.handleTranscript(segment)
+              }
+            },
+            onError: { [weak self] error in
+              Task { @MainActor in
+                logError("PushToTalkManager: transcription error", error: error)
+                self?.stopListening()
+              }
+            },
+            onConnected: {
+              Task { @MainActor in
+                log("PushToTalkManager: DeepGram connected")
+              }
+            },
+            onDisconnected: {
+              Task { @MainActor in
+                log("PushToTalkManager: DeepGram disconnected")
+              }
             }
-          },
-          onError: { [weak self] error in
-            Task { @MainActor in
-              logError("PushToTalkManager: transcription error", error: error)
-              self?.stopListening()
-            }
-          },
-          onConnected: {
-            Task { @MainActor in
-              log("PushToTalkManager: DeepGram connected")
-            }
-          },
-          onDisconnected: {
-            Task { @MainActor in
-              log("PushToTalkManager: DeepGram disconnected")
-            }
-          }
-        )
-      } catch {
-        logError("PushToTalkManager: failed to create TranscriptionService", error: error)
-        stopListening()
+          )
+        } catch {
+          logError("PushToTalkManager: failed to create TranscriptionService", error: error)
+          self.stopListening()
+        }
       }
     }
   }
