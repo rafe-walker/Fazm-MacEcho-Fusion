@@ -771,6 +771,9 @@ class ChatProvider: ObservableObject {
         }
         guard !acpBridgeStarted else { return true }
 
+        // Ensure API keys are fetched before checking availability
+        await KeyService.shared.ensureKeys()
+
         // If builtin mode and bundled key isn't available, try Vertex setup
         if bridgeMode == "builtin" && (KeyService.shared.anthropicAPIKey ?? "").isEmpty && vertexTokenManager == nil {
             let vtm = VertexTokenManager()
