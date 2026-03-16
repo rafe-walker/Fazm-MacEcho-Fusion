@@ -1,5 +1,6 @@
 import AppKit
 import Highlightr
+import ObjCExceptionCatcher
 import SwiftUI
 
 // MARK: - Plain-Text Copy NSTextView
@@ -86,8 +87,22 @@ struct PlainCopyText: NSViewRepresentable {
     func updateNSView(_ tv: NSTextView, context: Context) {
         // Only update if content actually changed to avoid layout thrashing
         if tv.textStorage?.string != attributedString.string {
-            tv.textStorage?.setAttributedString(attributedString)
-            tv.invalidateIntrinsicContentSize()
+            if let exception = ObjCExceptionCatcher.catching({
+                tv.textStorage?.setAttributedString(self.attributedString)
+                tv.invalidateIntrinsicContentSize()
+            }) {
+                log("PlainCopyText: NSException during setAttributedString — \(exception.name.rawValue): \(exception.reason ?? "nil"). String length=\(self.attributedString.length), attrs=\(self.attributedString.length > 0 ? String(describing: self.attributedString.attributes(at: 0, effectiveRange: nil).keys) : "empty")")
+                // Fallback: set plain text to avoid crash
+                let plain = self.attributedString.string
+                tv.textStorage?.setAttributedString(NSAttributedString(
+                    string: plain,
+                    attributes: [
+                        .font: NSFont.systemFont(ofSize: 13),
+                        .foregroundColor: NSColor.white,
+                    ]
+                ))
+                tv.invalidateIntrinsicContentSize()
+            }
         }
     }
 }
