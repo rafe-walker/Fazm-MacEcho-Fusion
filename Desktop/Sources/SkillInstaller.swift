@@ -17,10 +17,11 @@ enum SkillInstaller {
         "deep-research": "Research & Planning", "travel-planner": "Research & Planning", "web-scraping": "Research & Planning",
         "social-autoposter": "Social Media", "social-autoposter-setup": "Social Media",
         "find-skills": "Discovery",
+        "ai-browser-profile": "Personal",
     ]
 
     private static let categoryOrder = [
-        "Documents", "Creation", "Research & Planning", "Social Media", "Discovery"
+        "Personal", "Documents", "Creation", "Research & Planning", "Social Media", "Discovery"
     ]
 
     /// Auto-discovered skill names from all *.skill.md files in the app bundle's BundledSkills directory.
