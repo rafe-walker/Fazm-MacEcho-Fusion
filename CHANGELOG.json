@@ -72,6 +72,7 @@
     "Fixed noisy Sentry reports when no microphone is available, added retry logic and \"No microphone detected\" hint in Settings",
     "Fixed issue where completing Claude sign-in would dismiss the popup without retrying the interrupted query",
     "Fixed Claude sign-in window appearing off-screen on multi-monitor setups",
-    "Fixed chat messages disappearing and stale error button after browser extension setup"
+    "Fixed chat messages disappearing and stale error button after browser extension setup",
+    "Fixed security issue: API keys are no longer bundled in the app. Authentication now uses per-user Firebase tokens"
   ]
 }
