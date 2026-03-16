@@ -1075,26 +1075,6 @@ class FloatingControlBarManager {
             }
         }
 
-        // Debug: simulate Connect Claude button appearing
-        // Trigger: xcrun swift -e 'import Foundation; DistributedNotificationCenter.default().postNotificationName(.init("com.fazm.testConnectClaude"), object: nil, userInfo: nil, deliverImmediately: true); RunLoop.current.run(until: Date(timeIntervalSinceNow: 1.0))'
-        DistributedNotificationCenter.default().addObserver(
-            forName: NSNotification.Name("com.fazm.testConnectClaude"),
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                guard let self, let window = self.window else { return }
-                log("FloatingControlBarManager: Simulating Connect Claude button")
-                if !window.isVisible { self.show() }
-                window.showAIConversation()
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    window.state.showingAIResponse = true
-                    window.state.showConnectClaudeButton = true
-                    window.state.currentAIMessage = ChatMessage(text: "Your free built-in credits have run out. Connect your Claude account to continue.", sender: .ai)
-                }
-            }
-        }
-
         // Debug: send a text query via distributed notification
         // Trigger: xcrun swift -e 'import Foundation; DistributedNotificationCenter.default().postNotificationName(.init("com.fazm.testQuery"), object: nil, userInfo: ["text": "your query here"], deliverImmediately: true); RunLoop.current.run(until: Date(timeIntervalSinceNow: 1.0))'
         DistributedNotificationCenter.default().addObserver(
