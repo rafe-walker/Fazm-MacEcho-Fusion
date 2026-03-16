@@ -93,6 +93,7 @@
     "Fixed model not being applied correctly after resuming a previous session",
     "Fixed false auth error detection causing unnecessary sign-in prompts",
     "Reset Onboarding now also signs out, disconnects browser extension, Claude account, and Google Workspace",
-    "Fixed app showing as damaged after update due to invalid Python venv symlinks in bundle"
+    "Fixed app showing as damaged after update due to invalid Python venv symlinks in bundle",
+    "Fixed post-onboarding tutorial not showing after resetting onboarding"
   ]
 }
