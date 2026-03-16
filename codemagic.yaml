@@ -301,14 +301,10 @@ workflows:
               --exclude='*.pyc' --exclude='.ruff_cache' --exclude='tests' \
               --exclude='docs' --exclude='build' --exclude='dist' --exclude='*.egg-info' \
               /tmp/google_workspace_mcp/ "$GWS_MCP_BUNDLE/"
-            if command -v uv &>/dev/null; then
-              uv venv "$GWS_MCP_BUNDLE/.venv" --python python3.12 --quiet || true
-              GWS_DEPS=$(python3 -c 'import tomllib; f=open("/tmp/google_workspace_mcp/pyproject.toml","rb"); print(" ".join(tomllib.load(f)["project"]["dependencies"]))')
-              uv pip install --python "$GWS_MCP_BUNDLE/.venv/bin/python3" $GWS_DEPS --quiet || true
-              echo "Bundled Google Workspace MCP with venv"
-            else
-              echo "WARNING: uv not found — Google Workspace MCP skipped"
-            fi
+            # Extract dependencies to requirements.txt — venv is created at runtime
+            # (bundling a venv with absolute symlinks breaks Gatekeeper)
+            python3 -c 'import tomllib; f=open("/tmp/google_workspace_mcp/pyproject.toml","rb"); deps=tomllib.load(f)["project"]["dependencies"]; [print(d) for d in deps]' > "$GWS_MCP_BUNDLE/requirements.txt" 2>/dev/null || true
+            echo "Bundled Google Workspace MCP (venv will be created at runtime)"
           else
             echo "WARNING: Google Workspace MCP not cloned — skipping"
           fi
