@@ -83,11 +83,11 @@ class ScreenCaptureManager {
     /// Downscales large images and adjusts quality to stay under the API size limit.
     private static func saveImage(_ image: CGImage) -> URL? {
         let fileManager = FileManager.default
-        guard let documentsDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            log("ScreenCaptureManager: Could not find documents directory")
+        guard let appSupportDirectory = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            log("ScreenCaptureManager: Could not find Application Support directory")
             return nil
         }
-        let screenshotsDirectory = documentsDirectory
+        let screenshotsDirectory = appSupportDirectory
             .appendingPathComponent("Fazm")
             .appendingPathComponent("Screenshots")
 
@@ -132,5 +132,29 @@ class ScreenCaptureManager {
         // Even at lowest quality it's too big — save anyway (bridge will handle gracefully)
         log("ScreenCaptureManager: Screenshot saved to \(fileURL.path) (may exceed size limit)")
         return fileURL
+    }
+
+    /// Delete screenshots older than the specified number of days.
+    static func cleanupOldScreenshots(olderThan days: Int = 30) {
+        let fileManager = FileManager.default
+        guard let appSupportDirectory = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return }
+        let screenshotsDirectory = appSupportDirectory
+            .appendingPathComponent("Fazm")
+            .appendingPathComponent("Screenshots")
+
+        guard let files = try? fileManager.contentsOfDirectory(at: screenshotsDirectory, includingPropertiesForKeys: [.creationDateKey]) else { return }
+
+        let cutoff = Date().addingTimeInterval(-Double(days) * 86400)
+        var deleted = 0
+        for file in files {
+            guard let attrs = try? file.resourceValues(forKeys: [.creationDateKey]),
+                  let created = attrs.creationDate,
+                  created < cutoff else { continue }
+            try? fileManager.removeItem(at: file)
+            deleted += 1
+        }
+        if deleted > 0 {
+            log("ScreenCaptureManager: Cleaned up \(deleted) screenshots older than \(days) days")
+        }
     }
 }
