@@ -350,6 +350,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         }
 
+        // Clean up old screenshots in the background
+        Task.detached { ScreenCaptureManager.cleanupOldScreenshots() }
+
         log("AppDelegate: applicationDidFinishLaunching completed")
     }
 
