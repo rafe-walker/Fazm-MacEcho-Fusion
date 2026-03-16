@@ -168,7 +168,7 @@ class ShortcutSettings: ObservableObject {
         didSet { UserDefaults.standard.set(pttTranscriptionMode.rawValue, forKey: "shortcut_pttTranscriptionMode") }
     }
 
-    /// When true, the floating bar can be repositioned by dragging. Off by default.
+    /// When true, the floating bar can be repositioned by dragging. On by default.
     @Published var draggableBarEnabled: Bool {
         didSet { UserDefaults.standard.set(draggableBarEnabled, forKey: "shortcut_draggableBarEnabled") }
     }
@@ -207,7 +207,7 @@ class ShortcutSettings: ObservableObject {
         } else {
             self.pttTranscriptionMode = .batch
         }
-        self.draggableBarEnabled = UserDefaults.standard.object(forKey: "shortcut_draggableBarEnabled") as? Bool ?? false
+        self.draggableBarEnabled = UserDefaults.standard.object(forKey: "shortcut_draggableBarEnabled") as? Bool ?? true
         if let saved = UserDefaults.standard.string(forKey: "shortcut_proactivenessLevel"),
            let level = ProactivenessLevel(rawValue: saved) {
             self.proactivenessLevel = level
