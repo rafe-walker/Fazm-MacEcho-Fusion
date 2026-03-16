@@ -101,6 +101,9 @@ class FloatingControlBarState: NSObject, ObservableObject {
     // Send button hint (pulsating animation during tutorial)
     @Published var showSendButtonHint: Bool = false
 
+    // Claude account connection prompt (shown when auth is needed or credits exhausted)
+    @Published var showConnectClaudeButton: Bool = false
+
     // Tutorial chat guide state
     @Published var isTutorialChatActive: Bool = false
     @Published var tutorialChatStep: Int = 0  // 0 = first prompt done (from overlay), 1-3 = guided prompts
