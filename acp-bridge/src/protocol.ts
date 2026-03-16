@@ -13,7 +13,7 @@ export interface QueryMessage {
   mode?: "ask" | "act";
   model?: string;
   resume?: string;
-  imageBase64?: string;
+  imagePath?: string;
 }
 
 export interface ToolResultMessage {
