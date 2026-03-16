@@ -89,7 +89,8 @@ actor VertexTokenManager {
     /// Whether the backend is configured (env vars present)
     var isConfigured: Bool {
         get async {
-            !backendUrl.isEmpty && await AuthService.shared.isSignedIn
+            guard !backendUrl.isEmpty else { return false }
+            return await AuthService.shared.isSignedIn
         }
     }
 
