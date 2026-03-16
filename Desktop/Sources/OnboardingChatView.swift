@@ -219,17 +219,14 @@ struct OnboardingChatView: View {
                                     .padding(.leading, 44)
                             }
 
-                            // Show the question text from ask_followup above the buttons
+                            // Show the question text from ask_followup as a subtle label above the buttons
                             if !quickReplyQuestion.isEmpty {
                                 Text(quickReplyQuestion)
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.white.opacity(0.9))
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 10)
-                                    .background(FazmColors.backgroundSecondary)
-                                    .cornerRadius(18)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(FazmColors.textSecondary.opacity(0.8))
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .padding(.leading, 44)
+                                    .padding(.bottom, -4)
                             }
 
                             HStack(spacing: 8) {
