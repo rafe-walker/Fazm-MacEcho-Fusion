@@ -105,15 +105,18 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
 
         if ShortcutSettings.shared.draggableBarEnabled,
            let savedPosition = UserDefaults.standard.string(forKey: FloatingControlBarWindow.positionKey) {
-            let origin = NSPointFromString(savedPosition)
-            // Verify saved position is on a visible screen
+            let savedOrigin = NSPointFromString(savedPosition)
+            // Only restore the horizontal position from drag — vertical is always
+            // computed the same way as non-draggable mode (20pt above dock).
+            let targetScreen = NSScreen.main ?? NSScreen.screens.first
+            let visibleFrame = targetScreen?.visibleFrame ?? .zero
+            let defaultY = visibleFrame.minY + 20
+            let origin = NSPoint(x: savedOrigin.x, y: defaultY + FloatingControlBarWindow.collapsedYOffset)
+            // Verify saved X is on a visible screen
             let onScreen = NSScreen.screens.contains { $0.visibleFrame.contains(NSPoint(x: origin.x + 14, y: origin.y + 14)) }
             if onScreen {
-                // Saved position was from drag, which may have included collapsedYOffset.
-                // The pill will always be at collapsed size during init, so use origin as-is
-                // for placement and derive canonicalBottomY by stripping the offset.
                 self.setFrameOrigin(origin)
-                canonicalBottomY = origin.y - FloatingControlBarWindow.collapsedYOffset
+                canonicalBottomY = defaultY
             } else {
                 centerOnMainScreen()
             }
@@ -849,10 +852,8 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
         // Programmatic moves (resize animations, chat open/close) should not
         // overwrite the saved position — that causes silent drift.
         guard isUserDragging else { return }
-        // When dragging the collapsed pill, frame.origin.y includes collapsedYOffset.
-        // Strip it so canonicalBottomY stays the true base position.
-        let isCollapsedSize = (frame.size == FloatingControlBarWindow.minBarSize)
-        canonicalBottomY = self.frame.origin.y - (isCollapsedSize ? FloatingControlBarWindow.collapsedYOffset : 0)
+        // Drag is horizontal-only — don't update canonicalBottomY from the drag.
+        // Only save the horizontal position; vertical is always computed from screen geometry.
         UserDefaults.standard.set(
             NSStringFromPoint(self.frame.origin), forKey: FloatingControlBarWindow.positionKey
         )
@@ -1399,7 +1400,7 @@ class FloatingControlBarManager {
             barWindow.makeKeyAndOrderFront(nil)
         }
 
-        AnalyticsManager.shared.floatingBarQuerySent(messageLength: message.count, hasScreenshot: screenshotData != nil)
+        AnalyticsManager.shared.floatingBarQuerySent(messageLength: message.count, hasScreenshot: screenshotData != nil, queryText: message)
 
         // Provider is already initialized by ViewModelContainer at app launch
 
