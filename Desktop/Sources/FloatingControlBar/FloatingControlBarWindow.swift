@@ -1068,6 +1068,9 @@ class FloatingControlBarManager {
                 let text = notification.userInfo?["text"] as? String ?? "take a screenshot of the full screen"
                 log("FloatingControlBarManager: Test query received: \(text)")
 
+                // Capture screenshot before showing the bar
+                self.captureScreenshotEarly()
+
                 // Show the bar and set up the UI as if the user typed the query
                 if !window.isVisible { self.show() }
                 window.state.displayedQuery = text
