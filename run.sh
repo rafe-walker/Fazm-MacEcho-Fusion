@@ -134,26 +134,6 @@ else
     substep "Downloaded ffmpeg to $FFMPEG_RESOURCE"
 fi
 
-step "Ensuring gws binary..."
-GWS_VERSION="0.6.3"
-GWS_BIN_DIR="Desktop/bin"
-GWS_BIN="$GWS_BIN_DIR/gws"
-if [ ! -f "$GWS_BIN" ]; then
-    substep "Downloading gws v$GWS_VERSION"
-    mkdir -p "$GWS_BIN_DIR"
-    ARCH=$(uname -m)
-    if [ "$ARCH" = "arm64" ]; then
-        GWS_ARTIFACT="gws-aarch64-apple-darwin.tar.gz"
-    else
-        GWS_ARTIFACT="gws-x86_64-apple-darwin.tar.gz"
-    fi
-    curl -sL "https://github.com/googleworkspace/cli/releases/download/v${GWS_VERSION}/${GWS_ARTIFACT}" | tar xz -C "$GWS_BIN_DIR" --strip-components=1 --include '*/gws'
-    chmod +x "$GWS_BIN"
-    substep "Downloaded gws to $GWS_BIN"
-else
-    substep "gws binary already present"
-fi
-
 step "Checking schema docs..."
 bash scripts/check_schema_docs.sh
 
@@ -218,10 +198,29 @@ if [ -d "$ACP_BRIDGE_DIR/dist" ]; then
     cp -Rf "$ACP_BRIDGE_DIR/node_modules" "$APP_BUNDLE/Contents/Resources/acp-bridge/"
 fi
 
-substep "Copying gws binary"
-if [ -f "$GWS_BIN" ]; then
-    cp -f "$GWS_BIN" "$APP_BUNDLE/Contents/Resources/gws"
-    chmod +x "$APP_BUNDLE/Contents/Resources/gws"
+# Bundle Google Workspace MCP (Python)
+GWS_MCP_REPO="$HOME/google_workspace_mcp"
+GWS_MCP_BUNDLE="$APP_BUNDLE/Contents/Resources/google-workspace-mcp"
+if [ -d "$GWS_MCP_REPO" ]; then
+    substep "Bundling Google Workspace MCP"
+    mkdir -p "$GWS_MCP_BUNDLE"
+    # Copy source (excluding dev artifacts)
+    rsync -a --exclude='.git' --exclude='__pycache__' --exclude='.venv' \
+        --exclude='*.pyc' --exclude='.ruff_cache' --exclude='tests' \
+        --exclude='docs' --exclude='build' --exclude='dist' --exclude='*.egg-info' \
+        "$GWS_MCP_REPO/" "$GWS_MCP_BUNDLE/"
+    # Create venv and install dependencies using uv
+    if command -v uv &>/dev/null; then
+        substep "Creating Python venv with uv"
+        uv venv "$GWS_MCP_BUNDLE/.venv" --python python3.12 --quiet 2>&1 | tail -1 || true
+        uv pip install --python "$GWS_MCP_BUNDLE/.venv/bin/python3" \
+            --project "$GWS_MCP_REPO" -e "$GWS_MCP_REPO" --quiet 2>&1 | tail -3 || true
+        substep "Bundled Google Workspace MCP with venv"
+    else
+        substep "Warning: uv not found — Google Workspace MCP will not work without dependencies"
+    fi
+else
+    echo "Warning: Google Workspace MCP not found at $GWS_MCP_REPO — skipping"
 fi
 
 substep "Copying .env.app"
@@ -280,11 +279,6 @@ if [ -n "$SIGN_IDENTITY" ]; then
     if [ -f "$MCP_BIN" ]; then
         substep "Signing mcp-server-macos-use"
         codesign --force --options runtime --sign "$SIGN_IDENTITY" "$MCP_BIN"
-    fi
-    GWS_BUNDLED_BIN="$APP_BUNDLE/Contents/Resources/gws"
-    if [ -f "$GWS_BUNDLED_BIN" ]; then
-        substep "Signing bundled gws binary"
-        codesign --force --options runtime --sign "$SIGN_IDENTITY" "$GWS_BUNDLED_BIN"
     fi
     substep "Signing app bundle"
     codesign --force --options runtime --entitlements Desktop/Fazm.entitlements --sign "$SIGN_IDENTITY" "$APP_BUNDLE"
