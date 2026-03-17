@@ -100,6 +100,7 @@
     "Fixed Cmd+, shortcut and Settings menu item when no window is open",
     "Fixed post-onboarding tutorial not showing after resetting onboarding",
     "Fixed 401 auth errors on API keys by retrying with a refreshed token",
-    "Fixed crash caused by missing Highlightr resource bundle"
+    "Fixed crash caused by missing Highlightr resource bundle",
+    "Fixed app hangs caused by resource monitoring, sound playback, and update alerts blocking the main thread"
   ]
 }
