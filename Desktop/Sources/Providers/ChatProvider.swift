@@ -2030,6 +2030,8 @@ class ChatProvider: ObservableObject {
     /// Queue of messages waiting to be sent after the current query finishes.
     /// Replaces the old single pendingFollowUpText. Checked at the end of `sendMessage`.
     private var pendingMessages: [(text: String, sessionKey: String?)] = []
+    /// Read-only accessor for pending message texts (used by UI to sync deletions).
+    var pendingMessageTexts: [String] { pendingMessages.map(\.text) }
     /// Session key of the currently running sendMessage call, so follow-ups can be chained on the same session.
     private var activeSessionKey: String?
 
