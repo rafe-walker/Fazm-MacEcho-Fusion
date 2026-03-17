@@ -68,6 +68,13 @@ class AuthState: ObservableObject {
     }
 }
 
+/// Stores SwiftUI's `openWindow` action so AppDelegate can reopen the settings window.
+@MainActor
+final class WindowOpener {
+    static let shared = WindowOpener()
+    var openWindow: OpenWindowAction?
+}
+
 @main
 struct FazmApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
@@ -671,8 +678,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         NSApp.activate(ignoringOtherApps: true)
         if !foundWindow {
-            log("AppDelegate: [MENUBAR] No Fazm window found — posting openSettingsWindow notification")
-            NotificationCenter.default.post(name: .openSettingsWindow, object: nil)
+            log("AppDelegate: [MENUBAR] No Fazm window found — recreating via WindowOpener")
+            WindowOpener.shared.openWindow?(id: "main")
+            NSApp.activate(ignoringOtherApps: true)
         }
     }
 
@@ -818,9 +826,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return false
         }
         // Window was deallocated — ask SwiftUI to recreate it
-        log("AppDelegate: No Fazm window found on dock click — posting openSettingsWindow notification")
-        NotificationCenter.default.post(name: .openSettingsWindow, object: nil)
-        return true
+        log("AppDelegate: No Fazm window found on dock click — recreating via WindowOpener")
+        WindowOpener.shared.openWindow?(id: "main")
+        NSApp.activate(ignoringOtherApps: true)
+        return false
     }
 
     func applicationWillTerminate(_ notification: Notification) {
