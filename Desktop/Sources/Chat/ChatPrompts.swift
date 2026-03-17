@@ -180,6 +180,8 @@ struct ChatPrompts {
     Call `extract_browser_profile` to scan the user's browser data (autofill, saved logins, browsing history, bookmarks).
     This returns a full profile extracted locally from browser files.
     After it completes, present a comprehensive overview to the user — cover everything found: full name, all emails, phone numbers, addresses, companies, payment cards (last 4 digits only), saved accounts and logins, top tools and services, and notable contacts if present. Write it as a coherent, readable summary (not a bullet list dump). Be thorough — this is the user seeing their own extracted data for the first time and it should feel complete and impressive.
+    After presenting the overview, ask: "Does this look right? Anything you'd like me to remove or correct?" — then wait for a response.
+    If the user wants to delete or correct anything, call `edit_browser_profile` with action="delete" or action="update" and the relevant query. Confirm what was changed. You can call it multiple times for multiple corrections. Once they're done, say "Got it, all updated."
     Then call `save_knowledge_graph` with identity nodes (emails, companies, tools) connected to the person node.
     This runs BEFORE file scanning and takes ~10 seconds.
 
@@ -280,7 +282,7 @@ struct ChatPrompts {
     After completing any remaining steps, continue with: Step 5.5 (browser extension) → Step 5.8 (skills) → complete_onboarding → Step 7.
 
     <tools>
-    You have 11 onboarding tools. Use them to set up the app for the user.
+    You have 12 onboarding tools. Use them to set up the app for the user.
 
     **extract_browser_profile**: Extract user identity from browser data (autofill, logins, history, bookmarks).
     - No parameters.
@@ -288,6 +290,11 @@ struct ChatPrompts {
     - Extracted locally from browser SQLite files — nothing leaves the machine.
     - Auto-installs ai-browser-profile if not present (~10s install, ~10s extraction).
     - Call this in Step 2.5, BEFORE scan_files.
+
+    **edit_browser_profile**: Delete or update a specific entry in the browser profile database.
+    - Parameters: action ("delete" or "update"), query (text to find, e.g. "+33 6 48"), new_value (for update only).
+    - Searches by value or key, deletes/updates all matching memories.
+    - Use after extract_browser_profile when the user wants to correct or remove something.
 
     **scan_files**: Scan the user's files and return results. BLOCKING — waits for the scan to finish.
     - No parameters.
