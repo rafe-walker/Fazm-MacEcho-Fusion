@@ -675,7 +675,7 @@ function buildMcpServers(mode: string, cwd?: string, sessionKey?: string): McpSe
   if (cwd) {
     fazmToolsEnv.push({ name: "FAZM_WORKSPACE", value: cwd });
   }
-  if (sessionKey === "onboarding") {
+  if (sessionKey === "onboarding" || sessionKey === "browser-migration") {
     fazmToolsEnv.push({ name: "FAZM_ONBOARDING", value: "true" });
   }
   servers.push({
