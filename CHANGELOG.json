@@ -95,6 +95,11 @@
     "Reset Onboarding now also signs out, disconnects browser extension, Claude account, and Google Workspace",
     "Fixed app showing as damaged after update due to invalid Python venv symlinks in bundle",
     "Fixed post-onboarding tutorial not showing after resetting onboarding",
-    "Added Settings menu item (Cmd+,) and fixed window not reopening after close"
+    "Added Settings menu item (Cmd+,) and fixed window not reopening after close",
+    "Added AI browser profile \u2014 Fazm can now read your browser history and saved accounts to give smarter, personalized answers",
+    "Fixed Cmd+, shortcut and Settings menu item when no window is open",
+    "Fixed post-onboarding tutorial not showing after resetting onboarding",
+    "Fixed 401 auth errors on API keys by retrying with a refreshed token",
+    "Fixed crash caused by missing Highlightr resource bundle"
   ]
 }
