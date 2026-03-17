@@ -911,6 +911,7 @@ class FloatingControlBarManager {
     private var authCancellable: AnyCancellable?
     private(set) var chatProvider: ChatProvider?
     private var workspaceObserver: Any?
+    private var dequeueObserver: Any?
 
     /// PID of the last active app before Fazm. Used to capture that app's window for screenshots.
     private(set) var lastActiveAppPID: pid_t = 0
@@ -1061,6 +1062,18 @@ class FloatingControlBarManager {
         barWindow.onConnectClaude = { [weak chatProvider] in
             guard let provider = chatProvider else { return }
             ClaudeAuthWindowController.shared.show(chatProvider: provider)
+        }
+
+        // Observe ChatProvider dequeuing messages to sync UI queue
+        dequeueObserver = NotificationCenter.default.addObserver(
+            forName: .chatProviderDidDequeue, object: nil, queue: .main
+        ) { [weak barWindow] notification in
+            guard let text = notification.userInfo?["text"] as? String,
+                  let state = barWindow?.state else { return }
+            // Remove the first matching queued message from UI
+            if let idx = state.messageQueue.firstIndex(where: { $0.text == text }) {
+                state.messageQueue.remove(at: idx)
+            }
         }
 
         // Observe recording state
@@ -1298,8 +1311,34 @@ class FloatingControlBarManager {
         window.onInterruptAndFollowUp = { [weak provider] message in
             guard let provider = provider else { return }
             Task { @MainActor in
-                await provider.sendFollowUp(message)
+                await provider.interruptAndSend(message)
             }
+        }
+
+        window.onEnqueueMessage = { [weak provider] message in
+            provider?.enqueueMessage(message)
+        }
+
+        window.onSendNowQueued = { [weak provider] item in
+            guard let provider = provider else { return }
+            Task { @MainActor in
+                await provider.interruptAndSend(item.text)
+            }
+        }
+
+        window.onDeleteQueued = { [weak provider] item in
+            guard let provider = provider else { return }
+            if let idx = provider.pendingMessageTexts.firstIndex(of: item.text) {
+                provider.removePendingMessage(at: idx)
+            }
+        }
+
+        window.onClearQueue = { [weak provider] in
+            provider?.clearPendingMessages()
+        }
+
+        window.onReorderQueue = { [weak provider] source, dest in
+            provider?.reorderPendingMessages(from: source, to: dest)
         }
 
         window.onStopAgent = { [weak provider] in
