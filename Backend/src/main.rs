@@ -5,6 +5,7 @@ use tower_http::trace::TraceLayer;
 
 mod auth;
 mod config;
+mod firestore;
 mod routes;
 
 use config::Config;
@@ -42,6 +43,14 @@ async fn main() {
         .route(
             "/v1/keys",
             axum::routing::post(routes::keys::get_keys),
+        )
+        .route(
+            "/api/releases/register",
+            axum::routing::post(routes::releases::register),
+        )
+        .route(
+            "/api/releases/promote",
+            axum::routing::patch(routes::releases::promote),
         )
         .layer(middleware::from_fn(auth::auth_middleware));
 

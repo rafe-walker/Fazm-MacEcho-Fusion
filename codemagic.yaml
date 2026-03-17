@@ -673,6 +673,29 @@ workflows:
 
           echo "GitHub release created: $CM_TAG (staging=$IS_STAGING)"
 
+      - name: Register release in Firestore
+        script: |
+          # Register this release in Firestore as "staging" channel so the appcast
+          # picks it up. The RELEASE_SECRET authenticates to the Fazm backend.
+          if [ -z "$RELEASE_SECRET" ]; then
+            echo "Warning: RELEASE_SECRET not set, skipping Firestore registration"
+          else
+            RESPONSE=$(curl -s -w "\n%{http_code}" \
+              -X POST \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer $RELEASE_SECRET" \
+              -d "{\"tag\": \"$CM_TAG\", \"version\": \"$VERSION\", \"build\": \"$BUILD_NUMBER\"}" \
+              "${FAZM_BACKEND_URL}/api/releases/register")
+            HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+            BODY=$(echo "$RESPONSE" | sed '$d')
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✓ Release registered: $CM_TAG (channel=staging)"
+            else
+              echo "⚠ Release registration returned HTTP $HTTP_CODE: $BODY"
+              echo "Continuing — appcast fallback will use GitHub isPrerelease flag"
+            fi
+          fi
+
       - name: Deploy appcast.xml
         script: |
           ./scripts/deploy-appcast.sh
