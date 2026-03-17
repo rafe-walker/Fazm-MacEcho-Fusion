@@ -343,6 +343,10 @@ struct FloatingControlBarView: View {
                 guard state.messageQueue.count < FloatingControlBarState.maxQueueSize else { return }
                 state.enqueue(message)
                 onEnqueueMessage?(message)
+                AnalyticsManager.shared.floatingBarMessageQueued(
+                    queueSize: state.messageQueue.count,
+                    messageLength: message.count
+                )
             },
             onSendNow: { item in
                 // Remove from queue
