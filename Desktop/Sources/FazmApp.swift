@@ -318,6 +318,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         }
 
+        // Cmd+, to open settings — local monitor catches it even when no window is open
+        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "," {
+                Task { @MainActor in self?.openFazmFromMenu() }
+                return nil // consume the event
+            }
+            return event
+        }
+
         // Set up menu bar icon with NSStatusBar (more reliable than SwiftUI MenuBarExtra)
         // Called synchronously on main thread to ensure status item is created before app finishes launching
         Task { @MainActor in
