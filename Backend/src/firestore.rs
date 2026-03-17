@@ -1,14 +1,16 @@
-/// Minimal Firestore REST API client using service account JWT auth.
+/// Minimal Firestore REST API client.
 ///
-/// Uses the same private key as the Vertex AI integration (VERTEX_SA_PRIVATE_KEY_PEM)
-/// to obtain a Google API access token via the OAuth2 JWT bearer grant, then reads
-/// and writes documents via the Firestore REST API.
+/// Gets access tokens from the GCE metadata server (available in Cloud Run,
+/// GCE, GKE, etc.).  Falls back to a service-account JWT bearer exchange for
+/// environments where the metadata server is unavailable (e.g. local dev).
 use crate::config::Config;
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
+const METADATA_TOKEN_URL: &str =
+    "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
 const FIRESTORE_SCOPE: &str = "https://www.googleapis.com/auth/datastore";
 const COLLECTION: &str = "desktop_releases";
 
@@ -28,13 +30,41 @@ struct TokenResponse {
     access_token: String,
 }
 
+/// Obtain a Google API access token.
+///
+/// 1. Try the GCE/Cloud Run metadata server (no credentials required).
+/// 2. Fall back to JWT bearer exchange using `VERTEX_SA_PRIVATE_KEY_PEM` +
+///    `GCP_SERVICE_ACCOUNT` (works outside GCP for local/CI use).
 pub async fn get_access_token(
     config: &Arc<Config>,
 ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-    let now = chrono::Utc::now().timestamp();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()?;
 
+    // 1. Metadata server (preferred in Cloud Run)
+    let meta_result = client
+        .get(format!("{METADATA_TOKEN_URL}?scopes={FIRESTORE_SCOPE}"))
+        .header("Metadata-Flavor", "Google")
+        .send()
+        .await;
+
+    if let Ok(resp) = meta_result {
+        if resp.status().is_success() {
+            let tr: TokenResponse = resp.json().await?;
+            return Ok(tr.access_token);
+        }
+    }
+
+    // 2. JWT bearer fallback
+    let sa_email = &config.gcp_service_account;
+    if sa_email.is_empty() {
+        return Err("Metadata server unavailable and GCP_SERVICE_ACCOUNT is not set".into());
+    }
+
+    let now = chrono::Utc::now().timestamp();
     let claims = GoogleJwtClaims {
-        iss: config.gcp_service_account.clone(),
+        iss: sa_email.clone(),
         scope: FIRESTORE_SCOPE.to_string(),
         aud: TOKEN_URL.to_string(),
         iat: now,
@@ -47,8 +77,7 @@ pub async fn get_access_token(
 
     let jwt = encode(&header, &claims, &key)?;
 
-    let client = reqwest::Client::new();
-    let resp: TokenResponse = client
+    let resp: TokenResponse = reqwest::Client::new()
         .post(TOKEN_URL)
         .form(&[
             ("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"),
