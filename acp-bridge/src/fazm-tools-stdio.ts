@@ -268,6 +268,19 @@ This is the ONLY way to see what's on the user's desktop. Do NOT use playwright'
     },
   },
   {
+    name: "edit_browser_profile",
+    description: `Delete or update a specific entry in the user's browser profile database. Use after showing the profile summary to apply corrections the user requests. For delete: finds memories matching the query and removes them. For update: finds the matching memory and sets a new value.`,
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        action: { type: "string" as const, enum: ["delete", "update"], description: "Whether to delete or update the matched memory" },
+        query: { type: "string" as const, description: "Text to search for in the memory value, e.g. '+33 6 48 14 07 38' or 'french phone'" },
+        new_value: { type: "string" as const, description: "For update only: the replacement value" },
+      },
+      required: ["action", "query"],
+    },
+  },
+  {
     name: "query_browser_profile",
     description: `Search the user's locally-extracted browser profile (identity, accounts, tools, contacts, addresses, payments). Use when the user asks about themselves or you need personal context. Data comes from browser autofill, saved logins, history, and bookmarks — extracted locally, nothing leaves the machine.`,
     inputSchema: {
@@ -599,8 +612,8 @@ async function handleJsonRpc(
             result: { content: [{ type: "text", text: result }] },
           });
         }
-      } else if (toolName === "query_browser_profile") {
-        // Always-available tool — forward to Swift
+      } else if (toolName === "query_browser_profile" || toolName === "edit_browser_profile") {
+        // Always-available tools — forward to Swift
         const result = await requestSwiftTool(toolName, args);
         if (!isNotification) {
           send({
