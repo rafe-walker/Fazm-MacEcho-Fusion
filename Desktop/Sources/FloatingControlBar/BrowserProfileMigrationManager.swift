@@ -21,10 +21,19 @@ class BrowserProfileMigrationManager {
 
     /// Check if migration is needed and start the flow if so.
     func startIfNeeded(barState: FloatingControlBarState) {
-        guard needsMigration() else { return }
+        guard needsMigration() else {
+            log("BrowserProfileMigration: startIfNeeded — not needed")
+            return
+        }
         // Don't overlap with tutorial
-        guard !barState.isTutorialChatActive else { return }
-        guard !barState.isBrowserMigrationActive else { return }
+        guard !barState.isTutorialChatActive else {
+            log("BrowserProfileMigration: startIfNeeded — skipped, tutorial active")
+            return
+        }
+        guard !barState.isBrowserMigrationActive else {
+            log("BrowserProfileMigration: startIfNeeded — already active")
+            return
+        }
 
         barState.isBrowserMigrationActive = true
         barState.browserMigrationSystemPromptSuffix = ChatPrompts.browserProfileMigration
@@ -66,11 +75,16 @@ class BrowserProfileMigrationManager {
     private func needsMigration() -> Bool {
         let hasOnboarded = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
         let alreadyDone = UserDefaults.standard.bool(forKey: userDefaultsKey)
-        guard hasOnboarded && !alreadyDone else { return false }
+        guard hasOnboarded && !alreadyDone else {
+            log("BrowserProfileMigration: needsMigration=false (onboarded=\(hasOnboarded), alreadyDone=\(alreadyDone))")
+            return false
+        }
 
         let memoriesDb = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("ai-browser-profile/memories.db")
-        return !FileManager.default.fileExists(atPath: memoriesDb.path)
+        let exists = FileManager.default.fileExists(atPath: memoriesDb.path)
+        log("BrowserProfileMigration: needsMigration=\(!exists) (memories.db exists=\(exists))")
+        return !exists
     }
 
     private func observeResponses(barState: FloatingControlBarState) {
