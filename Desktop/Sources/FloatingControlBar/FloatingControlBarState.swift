@@ -8,6 +8,17 @@ struct FloatingChatExchange: Identifiable {
     let aiMessage: ChatMessage
 }
 
+/// A message waiting in the queue to be sent after the current query finishes.
+struct QueuedMessage: Identifiable, Equatable {
+    let id: UUID = UUID()
+    let text: String
+    let timestamp: Date = Date()
+
+    static func == (lhs: QueuedMessage, rhs: QueuedMessage) -> Bool {
+        lhs.id == rhs.id
+    }
+}
+
 /// Observable object holding the state for the floating control bar.
 @MainActor
 class FloatingControlBarState: NSObject, ObservableObject {
@@ -56,6 +67,37 @@ class FloatingControlBarState: NSObject, ObservableObject {
 
     /// Pre-filled text for the follow-up input (set by PTT, consumed by AIResponseView)
     @Published var pendingFollowUpText: String = ""
+
+    /// Task queue: messages waiting to be sent after current query completes (max 10)
+    @Published var messageQueue: [QueuedMessage] = []
+
+    /// Maximum number of queued messages
+    static let maxQueueSize = 10
+
+    /// Append a message to the queue. Returns false if queue is full.
+    @discardableResult
+    func enqueue(_ text: String) -> Bool {
+        guard messageQueue.count < Self.maxQueueSize else { return false }
+        messageQueue.append(QueuedMessage(text: text))
+        return true
+    }
+
+    /// Remove a queued message by ID
+    func dequeue(_ id: UUID) {
+        messageQueue.removeAll { $0.id == id }
+    }
+
+    /// Remove and return the first queued message
+    @discardableResult
+    func dequeueFirst() -> QueuedMessage? {
+        guard !messageQueue.isEmpty else { return nil }
+        return messageQueue.removeFirst()
+    }
+
+    /// Clear all queued messages
+    func clearQueue() {
+        messageQueue.removeAll()
+    }
 
     /// Draft input text preserved when the conversation is dismissed without sending
     var draftInputText: String = ""
