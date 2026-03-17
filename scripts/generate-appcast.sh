@@ -40,8 +40,8 @@ for r in releases:
 " | while read -r TAG; do
     echo "  Processing release: $TAG"
 
-    # Get release details including assets
-    RELEASE_DETAIL=$(gh release view "$TAG" --repo "$GITHUB_REPO" --json tagName,publishedAt,body,assets 2>/dev/null)
+    # Get release details including assets and prerelease status
+    RELEASE_DETAIL=$(gh release view "$TAG" --repo "$GITHUB_REPO" --json tagName,publishedAt,body,assets,isPrerelease 2>/dev/null)
 
     if [ -z "$RELEASE_DETAIL" ]; then
         echo "    Warning: Could not fetch details for $TAG, skipping"
@@ -58,6 +58,7 @@ tag = data['tagName']
 pub_date = data.get('publishedAt', '')
 body = data.get('body', '')
 assets = data.get('assets', [])
+is_prerelease = data.get('isPrerelease', True)
 
 # Find the .zip asset (Sparkle needs ZIP, not DMG)
 zip_asset = None
@@ -75,7 +76,10 @@ file_size = zip_asset['size']
 # Parse version from tag: v0.0.7+7-macos -> 0.0.7, build 7
 # Also handle staging tags: v0.0.7+7-macos-staging
 version_match = re.match(r'v?(\d+\.\d+\.\d+)(?:\+(\d+))?(?:-macos)?(?:-(staging))?', tag)
-is_staging = bool(version_match and version_match.group(3))
+# Use GitHub's isPrerelease flag to determine channel — not the tag suffix.
+# Non-prerelease (latest) releases get no channel tag (visible to all users).
+# Prerelease releases get the staging channel tag.
+is_staging = is_prerelease
 if not version_match:
     sys.exit(0)
 

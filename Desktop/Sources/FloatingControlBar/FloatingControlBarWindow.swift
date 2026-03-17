@@ -1365,6 +1365,11 @@ class FloatingControlBarManager {
         window.resizeToResponseHeightPublic(animated: true)
     }
 
+    /// Resize the floating bar to fit current response content (without resetting state).
+    func resizeToFitResponse() {
+        window?.resizeToResponseHeightPublic(animated: true)
+    }
+
     /// Expand the floating bar from collapsed state (used by PTT when bar was collapsed).
     func expandFromCollapsed(instant: Bool = false) {
         guard let window else { return }
