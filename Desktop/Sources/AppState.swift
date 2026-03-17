@@ -1228,4 +1228,6 @@ extension Notification.Name {
     static let navigateToTaskSettings = Notification.Name("navigateToTaskSettings")
     /// Posted from Settings to trigger the file indexing sheet
     static let triggerFileIndexing = Notification.Name("triggerFileIndexing")
+    /// Posted to open the main settings window (from menu bar, Cmd+,, dock click)
+    static let openSettingsWindow = Notification.Name("openSettingsWindow")
 }
