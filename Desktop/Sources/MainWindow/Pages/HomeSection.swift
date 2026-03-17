@@ -32,21 +32,19 @@ struct HomeSection: View {
     // MARK: - How to Use Fazm
 
     private var howToUseCard: some View {
-        HStack(spacing: 16) {
-            shortcutBadge(keys: [shortcutSettings.pttKey.symbol])
+        VStack(spacing: 14) {
+            Text("Talk to Fazm")
+                .scaledFont(size: 15, weight: .semibold)
+                .foregroundColor(FazmColors.textPrimary)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Talk to Fazm")
-                    .scaledFont(size: 15, weight: .semibold)
-                    .foregroundColor(FazmColors.textPrimary)
+            HomeKeyboardView(pttKey: shortcutSettings.pttKey)
 
-                (Text("Hold ") + Text(shortcutSettings.pttKey.rawValue).bold() + Text(" to speak, release to send"))
-                    .scaledFont(size: 13)
-                    .foregroundColor(FazmColors.textSecondary)
-            }
-
-            Spacer()
+            (Text("Hold ") + Text(shortcutSettings.pttKey.rawValue).bold() + Text(" to speak, release to send"))
+                .scaledFont(size: 13)
+                .foregroundColor(FazmColors.textSecondary)
+                .multilineTextAlignment(.center)
         }
+        .frame(maxWidth: .infinity)
         .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 12)
@@ -225,26 +223,6 @@ struct HomeSection: View {
 
     // MARK: - Helpers
 
-    private func shortcutBadge(keys: [String]) -> some View {
-        HStack(spacing: 3) {
-            ForEach(keys, id: \.self) { key in
-                Text(key)
-                    .scaledFont(size: 14, weight: .semibold)
-                    .foregroundColor(FazmColors.textPrimary)
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(FazmColors.backgroundQuaternary)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(FazmColors.border, lineWidth: 1)
-                )
-        )
-    }
-
     private func timeAgo(_ date: Date) -> String {
         let interval = Date().timeIntervalSince(date)
         if interval < 60 { return "just now" }
@@ -292,6 +270,74 @@ struct HomeSection: View {
                     log("HomeSection: DB read attempt \(attempt) failed: \(error)")
                 }
             }
+        }
+    }
+}
+
+// MARK: - HomeKeyboardView
+
+/// Compact keyboard bottom-row visualization for the homepage, highlighting the active PTT key.
+struct HomeKeyboardView: View {
+    let pttKey: ShortcutSettings.PTTKey
+
+    @State private var isPressed = false
+
+    private let kh: CGFloat = 24
+    private let gap: CGFloat = 2
+    private let keyColor = Color(nsColor: NSColor(white: 0.15, alpha: 1.0))
+    private let keyBorder = Color(nsColor: NSColor(white: 0.28, alpha: 1.0))
+
+    var body: some View {
+        HStack(spacing: gap) {
+            modKey("fn", for: .fn)
+            modKey("⌃", for: .leftControl)
+            modKey("⌥", for: .option)
+            modKey("⌘", for: .leftCommand)
+            // Space bar
+            Text("")
+                .font(.system(size: 9, weight: .medium))
+                .frame(width: 110, height: kh)
+                .background(RoundedRectangle(cornerRadius: 4).fill(keyColor))
+                .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(keyBorder, lineWidth: 0.5))
+            modKey("⌘", for: .rightCommand)
+            modKey("⌥", for: nil) // right option, not a PTT option
+        }
+        .padding(8)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color(nsColor: NSColor(white: 0.08, alpha: 1.0)))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
+        )
+        .onAppear { startPressAnimation() }
+    }
+
+    private func modKey(_ label: String, for key: ShortcutSettings.PTTKey?) -> some View {
+        let isHighlighted = key == pttKey
+        return Text(label)
+            .font(.system(size: 11, weight: isHighlighted ? .semibold : .medium))
+            .foregroundColor(isHighlighted ? .white : Color.white.opacity(0.4))
+            .frame(width: 30, height: kh)
+            .background(
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(isHighlighted ? FazmColors.purplePrimary.opacity(isPressed ? 0.6 : 0.25) : keyColor)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 4)
+                    .strokeBorder(isHighlighted ? FazmColors.purplePrimary.opacity(isPressed ? 1.0 : 0.7) : keyBorder, lineWidth: isHighlighted ? 1.5 : 0.5)
+            )
+            .shadow(color: isHighlighted ? FazmColors.purplePrimary.opacity(isPressed ? 0.8 : 0.4) : .clear, radius: isPressed ? 10 : 4, x: 0, y: 0)
+            .scaleEffect(isHighlighted && isPressed ? 0.92 : 1.0)
+            .animation(.easeInOut(duration: 0.15), value: isPressed)
+    }
+
+    private func startPressAnimation() {
+        withAnimation(.easeIn(duration: 0.15)) { isPressed = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            withAnimation(.easeOut(duration: 0.15)) { isPressed = false }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { startPressAnimation() }
         }
     }
 }
