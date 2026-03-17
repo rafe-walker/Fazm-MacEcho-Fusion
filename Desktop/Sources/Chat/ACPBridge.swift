@@ -406,7 +406,6 @@ actor ACPBridge {
     mode: String? = nil,
     model: String? = nil,
     resume: String? = nil,
-    imagePath: URL? = nil,
     onTextDelta: @escaping TextDeltaHandler,
     onToolCall: @escaping ToolCallHandler,
     onToolActivity: @escaping ToolActivityHandler,
@@ -442,9 +441,6 @@ actor ACPBridge {
     if let resume = resume {
       queryDict["resume"] = resume
     }
-    // imagePath is no longer sent — screenshot path is appended to prompt text
-    // so the model can read it via the Read tool if needed
-
     let jsonData = try JSONSerialization.data(withJSONObject: queryDict)
     guard let jsonString = String(data: jsonData, encoding: .utf8) else {
       throw BridgeError.encodingError
