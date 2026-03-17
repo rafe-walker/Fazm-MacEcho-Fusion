@@ -308,13 +308,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // Ensure app always shows in dock as a regular app
         NSApp.setActivationPolicy(.regular)
 
-        // Set up app menus (Format, Help, Settings) via AppKit instead of SwiftUI .commands {}
+        // Set up app menus (Format, Help) via AppKit instead of SwiftUI .commands {}
         // to avoid AttributeGraph crashes during menu rendering.
-        // Format/Help can be set up now; Settings… must be deferred because SwiftUI
-        // hasn't populated the app menu yet during applicationDidFinishLaunching.
         setupAppMenus()
+        // SwiftUI rebuilds the app menu dynamically, so we inject "Settings…" via delegate
         DispatchQueue.main.async { [weak self] in
-            self?.addSettingsMenuItem()
+            if let appMenu = NSApp.mainMenu?.items.first?.submenu {
+                appMenu.delegate = self
+            }
         }
 
         // Set up menu bar icon with NSStatusBar (more reliable than SwiftUI MenuBarExtra)
@@ -723,15 +724,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         openFazmFromMenu()
     }
 
-    /// Add "Settings…" (Cmd+,) to the app menu. Called after a short delay so SwiftUI's
-    /// menu bar is populated.
-    @MainActor private func addSettingsMenuItem() {
-        guard let mainMenu = NSApp.mainMenu,
-              let appMenu = mainMenu.items.first?.submenu else {
-            log("AppDelegate: [MENU] WARNING — could not find app menu for Settings item")
-            return
-        }
-        // Avoid duplicates if called more than once
+    /// Add "Settings…" (Cmd+,) to the app menu. Called via NSMenuDelegate right before
+    /// the menu opens, because SwiftUI rebuilds the app menu on each display.
+    @MainActor private func addSettingsMenuItem(to appMenu: NSMenu) {
+        // Avoid duplicates
         guard !appMenu.items.contains(where: { $0.title == "Settings…" }) else { return }
 
         let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
@@ -740,7 +736,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let insertIndex = min(2, appMenu.items.count)
         appMenu.insertItem(NSMenuItem.separator(), at: insertIndex)
         appMenu.insertItem(settingsItem, at: insertIndex + 1)
-        log("AppDelegate: [MENU] Added Settings… (Cmd+,) to app menu")
     }
 
     private func setupAppMenus() {
@@ -809,11 +804,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     // MARK: - NSMenuDelegate
     func menuWillOpen(_ menu: NSMenu) {
-        log("AppDelegate: [MENUBAR] Menu opened by user")
-        AnalyticsManager.shared.menuBarOpened()
-
-        // Update sign-out item visibility and title
+        // Status bar menu — update sign-out item
         if let signOutItem = menu.item(withTag: 1001) {
+            log("AppDelegate: [MENUBAR] Menu opened by user")
+            AnalyticsManager.shared.menuBarOpened()
             let isSignedIn = AuthState.shared.isSignedIn
             signOutItem.isHidden = !isSignedIn
             if let email = AuthState.shared.userEmail, !email.isEmpty {
@@ -821,6 +815,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             } else {
                 signOutItem.title = "Sign Out"
             }
+        }
+
+        // App menu — inject "Settings…" (SwiftUI rebuilds this menu each time)
+        if menu == NSApp.mainMenu?.items.first?.submenu {
+            addSettingsMenuItem(to: menu)
         }
     }
 
