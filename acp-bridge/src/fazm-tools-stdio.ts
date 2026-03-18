@@ -118,6 +118,7 @@ async function requestSwiftTool(
 // --- MCP tool definitions ---
 
 const isOnboarding = (process.env.FAZM_ONBOARDING || process.env.OMI_ONBOARDING) === "true";
+const isObserver = process.env.FAZM_OBSERVER === "true";
 
 const ONBOARDING_TOOL_NAMES = new Set([
   "check_permission_status",
@@ -128,6 +129,14 @@ const ONBOARDING_TOOL_NAMES = new Set([
   "ask_followup",
   "complete_onboarding",
   "save_knowledge_graph",
+]);
+
+// Observer session only gets these tools (KG, SQL, screenshots, skills)
+const OBSERVER_TOOL_NAMES = new Set([
+  "execute_sql",
+  "save_knowledge_graph",
+  "capture_screenshot",
+  "load_skill",
 ]);
 
 const ALL_TOOLS = [
@@ -369,10 +378,14 @@ Aim for 15-40 nodes with meaningful edges connecting them.`,
   },
 ];
 
-// Filter tools based on session type: onboarding sessions get onboarding tools,
-// regular sessions exclude them
+// Filter tools based on session type:
+// - onboarding: all tools
+// - observer: only observer-specific tools (KG, SQL, screenshots, skills)
+// - regular: all tools except onboarding-only tools
 const TOOLS = ALL_TOOLS.filter((t) =>
-  isOnboarding ? true : !ONBOARDING_TOOL_NAMES.has(t.name)
+  isOnboarding ? true
+  : isObserver ? OBSERVER_TOOL_NAMES.has(t.name)
+  : !ONBOARDING_TOOL_NAMES.has(t.name)
 );
 
 // --- JSON-RPC handling ---
