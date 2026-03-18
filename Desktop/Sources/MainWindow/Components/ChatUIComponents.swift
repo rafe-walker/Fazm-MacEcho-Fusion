@@ -90,6 +90,31 @@ struct ToolCallsGroup: View {
     let calls: [(name: String, status: ToolCallStatus, toolUseId: String?, input: ToolCallInput?, output: String?)]
     @State private var isExpanded = false
 
+    /// The currently running call, or the last call if all completed
+    private var latestCall: (name: String, status: ToolCallStatus, toolUseId: String?, input: ToolCallInput?, output: String?)? {
+        calls.last(where: { $0.status == .running }) ?? calls.last
+    }
+
+    private var hasRunningCalls: Bool {
+        calls.contains(where: { $0.status == .running })
+    }
+
+    /// One-line inline summary: shows what's happening right now
+    private var inlineSummary: String {
+        guard let call = latestCall else { return "" }
+        if call.status == .running {
+            return call.input?.summary ?? call.name
+        } else if let output = call.output, !output.isEmpty {
+            // Show first meaningful line of output
+            let firstLine = output
+                .split(separator: "\n", omittingEmptySubsequences: true)
+                .first.map(String.init) ?? output
+            return firstLine.count > 120 ? String(firstLine.prefix(120)) + "…" : firstLine
+        } else {
+            return call.input?.summary ?? call.name
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Button {
@@ -100,12 +125,30 @@ struct ToolCallsGroup: View {
                 HStack(spacing: 6) {
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                         .scaledFont(size: 10)
-                    Text("\(calls.count) tool \(calls.count == 1 ? "call" : "calls")")
-                        .scaledFont(size: 12, weight: .medium)
-                    if calls.contains(where: { $0.status == .running }) {
+
+                    if hasRunningCalls {
                         ProgressView()
                             .scaleEffect(0.5)
                             .frame(width: 12, height: 12)
+                    } else {
+                        Image(systemName: "checkmark.circle.fill")
+                            .scaledFont(size: 11)
+                            .foregroundColor(.green)
+                    }
+
+                    Text("\(calls.count) tool \(calls.count == 1 ? "call" : "calls")")
+                        .scaledFont(size: 12, weight: .medium)
+
+                    Text(inlineSummary)
+                        .scaledFont(size: 11)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+
+                    if hasRunningCalls {
+                        ToolElapsedTime()
+                            .scaledFont(size: 11)
+                            .foregroundColor(.secondary)
                     }
                 }
                 .foregroundColor(.secondary)
@@ -115,18 +158,39 @@ struct ToolCallsGroup: View {
             if isExpanded {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(Array(calls.enumerated()), id: \.offset) { _, call in
-                        HStack(spacing: 6) {
-                            Image(systemName: call.status == .running ? "arrow.triangle.2.circlepath" : "checkmark.circle.fill")
-                                .scaledFont(size: 11)
-                                .foregroundColor(call.status == .running ? .orange : .green)
-                            Text(call.name)
-                                .scaledFont(size: 12)
-                                .foregroundColor(.primary)
-                            if let input = call.input {
-                                Text(input.summary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 6) {
+                                if call.status == .running {
+                                    ProgressView()
+                                        .scaleEffect(0.4)
+                                        .frame(width: 11, height: 11)
+                                } else {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .scaledFont(size: 11)
+                                        .foregroundColor(.green)
+                                }
+                                Text(call.name)
+                                    .scaledFont(size: 12)
+                                    .foregroundColor(.primary)
+                                if let input = call.input {
+                                    Text(input.summary)
+                                        .scaledFont(size: 11)
+                                        .foregroundColor(.secondary)
+                                        .lineLimit(1)
+                                }
+                                if call.status == .running {
+                                    ToolElapsedTime()
+                                        .scaledFont(size: 11)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            // Show tool output inline when available
+                            if let output = call.output, !output.isEmpty {
+                                Text(output)
                                     .scaledFont(size: 11)
                                     .foregroundColor(.secondary)
-                                    .lineLimit(1)
+                                    .lineLimit(3)
+                                    .padding(.leading, 17)
                             }
                         }
                     }
@@ -135,6 +199,31 @@ struct ToolCallsGroup: View {
             }
         }
         .padding(.vertical, 4)
+    }
+}
+
+/// Shows elapsed time since the view appeared, updating every second
+private struct ToolElapsedTime: View {
+    @State private var startDate = Date()
+
+    var body: some View {
+        TimelineView(.periodic(from: startDate, by: 1)) { context in
+            let elapsed = Int(context.date.timeIntervalSince(startDate))
+            if elapsed >= 5 {
+                // Only show after 5 seconds to avoid flashing on quick tool calls
+                Text(formatElapsed(elapsed))
+            }
+        }
+    }
+
+    private func formatElapsed(_ seconds: Int) -> String {
+        if seconds < 60 {
+            return "\(seconds)s"
+        } else {
+            let m = seconds / 60
+            let s = seconds % 60
+            return "\(m)m \(s)s"
+        }
     }
 }
 
