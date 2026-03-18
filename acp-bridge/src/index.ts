@@ -191,7 +191,7 @@ async function startHindsight(): Promise<boolean> {
     "-m", "hindsight_api.main",
     "--host", "127.0.0.1",
     "--port", String(HINDSIGHT_PORT),
-    "--log-level", "debug",
+    "--log-level", "warning",
   ], {
     env: hindsightEnv,
     stdio: ["ignore", "pipe", "pipe"],
