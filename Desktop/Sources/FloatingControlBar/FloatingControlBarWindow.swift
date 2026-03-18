@@ -60,6 +60,16 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
     /// When true, clicks outside the app don't dismiss the chat (e.g. browser tool running).
     var suppressClickOutsideDismiss = false
 
+    // MARK: - Window-level drag tracking
+    /// Screen-space mouse position at the start of a potential drag gesture.
+    private var dragStartScreenLocation: NSPoint?
+    /// Window origin at the start of a potential drag gesture.
+    private var dragStartWindowOrigin: NSPoint?
+    /// True once the mouse has moved past the drag threshold during a gesture.
+    private var isDragGestureActive = false
+    /// Minimum distance (pt) the mouse must move before a drag gesture activates.
+    private static let dragThreshold: CGFloat = 4
+
     var onPlayPause: (() -> Void)?
     var onAskAI: (() -> Void)?
     var onHide: (() -> Void)?
@@ -129,6 +139,65 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
+
+    // MARK: - Window-level drag via sendEvent
+
+    /// Returns true if the view (or any ancestor) is a text input or resize handle
+    /// that should not trigger window dragging.
+    private func isInteractiveView(_ view: NSView?) -> Bool {
+        var current = view
+        while let v = current {
+            if v is NSTextView || v is NSTextField || v is ResizeHandleNSView { return true }
+            current = v.superview
+        }
+        return false
+    }
+
+    override func sendEvent(_ event: NSEvent) {
+        if ShortcutSettings.shared.draggableBarEnabled {
+            switch event.type {
+            case .leftMouseDown:
+                let hitView = contentView?.hitTest(event.locationInWindow)
+                if !isInteractiveView(hitView) {
+                    dragStartScreenLocation = NSEvent.mouseLocation
+                    dragStartWindowOrigin = frame.origin
+                    isDragGestureActive = false
+                }
+            case .leftMouseDragged:
+                if let startScreen = dragStartScreenLocation,
+                   let startOrigin = dragStartWindowOrigin {
+                    let currentScreen = NSEvent.mouseLocation
+                    let dx = currentScreen.x - startScreen.x
+                    if !isDragGestureActive {
+                        if abs(dx) > Self.dragThreshold {
+                            isDragGestureActive = true
+                            isUserDragging = true
+                            state.isDragging = true
+                        }
+                    }
+                    if isDragGestureActive {
+                        let newOrigin = NSPoint(x: startOrigin.x + dx, y: frame.origin.y)
+                        NSAnimationContext.beginGrouping()
+                        NSAnimationContext.current.duration = 0
+                        setFrameOrigin(newOrigin)
+                        NSAnimationContext.endGrouping()
+                        return // consume the event — don't pass through to subviews
+                    }
+                }
+            case .leftMouseUp:
+                if isDragGestureActive {
+                    isUserDragging = false
+                    state.isDragging = false
+                }
+                dragStartScreenLocation = nil
+                dragStartWindowOrigin = nil
+                isDragGestureActive = false
+            default:
+                break
+            }
+        }
+        super.sendEvent(event)
+    }
 
     override func keyDown(with event: NSEvent) {
         // Esc closes the AI conversation only — never hides the entire bar
