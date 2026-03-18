@@ -752,7 +752,9 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
             }
     }
 
-    /// Compute the default origin for the collapsed pill (bottom-center of a screen).
+    /// Compute the origin for the collapsed pill.
+    /// When dragging is enabled and a saved position exists, returns the user's saved X.
+    /// Otherwise falls back to horizontal screen center.
     /// - Parameter followFocus: when true, uses the key window's screen (for opening new
     ///   conversations to follow the user's focus). When false, uses the screen the bar
     ///   is already on (for closing/restoring to avoid jumping away mid-conversation).
@@ -760,15 +762,26 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
         let size = FloatingControlBarWindow.minBarSize
         let targetScreen: NSScreen?
         if followFocus {
-            // NSScreen.main follows the system-wide foreground app (not just our app's key window)
             targetScreen = NSScreen.main ?? self.screen ?? NSScreen.screens.first
         } else {
             targetScreen = self.screen ?? NSScreen.main ?? NSScreen.screens.first
         }
         guard let screen = targetScreen else { return .zero }
         let visibleFrame = screen.visibleFrame
-        let x = visibleFrame.midX - size.width / 2
         let y = visibleFrame.minY + 20
+
+        // Respect user's saved drag position when draggable bar is enabled
+        if ShortcutSettings.shared.draggableBarEnabled,
+           let savedPosition = UserDefaults.standard.string(forKey: FloatingControlBarWindow.positionKey) {
+            let savedOrigin = NSPointFromString(savedPosition)
+            let savedCenterX = savedOrigin.x + size.width / 2
+            // Only use saved X if it's on the target screen
+            if savedCenterX >= visibleFrame.minX && savedCenterX <= visibleFrame.maxX {
+                return NSPoint(x: savedOrigin.x, y: y)
+            }
+        }
+
+        let x = visibleFrame.midX - size.width / 2
         return NSPoint(x: x, y: y)
     }
 
