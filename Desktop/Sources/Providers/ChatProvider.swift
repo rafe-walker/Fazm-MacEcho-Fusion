@@ -2455,6 +2455,7 @@ class ChatProvider: ObservableObject {
                 }
             }
 
+            log("Chat query started (session=\(sessionKey ?? "main"), mode=\(bridgeMode), model=\(model ?? modelOverride ?? "default"))")
             let queryResult = try await acpBridge.query(
                 prompt: trimmedText,
                 systemPrompt: systemPrompt,
@@ -2635,7 +2636,8 @@ class ChatProvider: ObservableObject {
                 outputTokens: queryResult.outputTokens,
                 cacheReadTokens: queryResult.cacheReadTokens,
                 cacheWriteTokens: queryResult.cacheWriteTokens,
-                queryText: trimmedText
+                queryText: trimmedText,
+                ttftMs: firstTokenTime.map { Int($0.timeIntervalSince(queryStartTime) * 1000) }
             )
 
             // Track conversation depth (total messages in this session)
