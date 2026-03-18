@@ -3029,6 +3029,11 @@ class ChatProvider: ObservableObject {
                                 ObserverCardButton(id: "\(activityId)-approve", label: "Create skill", action: "approve"),
                                 ObserverCardButton(id: "\(activityId)-dismiss", label: "Skip", action: "dismiss"),
                             ]
+                        } else if type == "approval_request" {
+                            buttons = [
+                                ObserverCardButton(id: "\(activityId)-approve", label: "Approve", action: "approve"),
+                                ObserverCardButton(id: "\(activityId)-dismiss", label: "Reject", action: "dismiss"),
+                            ]
                         } else if type == "insight" || type == "card" || type == "summary" || type == "kg_update" || type == "pattern" {
                             buttons = [
                                 ObserverCardButton(id: "\(activityId)-approve", label: "Useful", action: "approve"),
@@ -3110,13 +3115,82 @@ class ChatProvider: ObservableObject {
                     "card_type": cardType ?? "unknown",
                 ])
 
-                // If approved a skill draft, trigger skill creation
+                // Execute pending operations on approval
                 if action == "approve" {
-                    await createSkillFromObserverDraft(activityId: activityId)
+                    await executeApprovedObserverOperations(activityId: activityId)
                 }
             } catch {
                 log("ChatProvider: Failed to update observer card: \(error)")
             }
+        }
+    }
+
+    /// Execute pending operations from an approved observer card (writes, KG saves, skill drafts)
+    private func executeApprovedObserverOperations(activityId: Int64) async {
+        guard let dbQueue = await AppDatabase.shared.getDatabaseQueue() else { return }
+        do {
+            let row = try await dbQueue.read { db in
+                try Row.fetchOne(db, sql: "SELECT type, content FROM observer_activity WHERE id = ?", arguments: [activityId])
+            }
+            guard let contentJson: String = row?["content"],
+                  let type: String = row?["type"],
+                  let jsonData = contentJson.data(using: .utf8),
+                  let parsed = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
+                log("ChatProvider: Observer approve — no content for id=\(activityId)")
+                return
+            }
+
+            if type == "skill_draft" {
+                await createSkillFromObserverDraft(activityId: activityId)
+                return
+            }
+
+            // Execute pending operations (SQL writes, KG saves)
+            if let operations = parsed["pending_operations"] as? [[String: Any]] {
+                for op in operations {
+                    guard let tool = op["tool"] as? String,
+                          let opArgs = op["args"] as? [String: Any] else { continue }
+
+                    if tool == "execute_sql", let query = opArgs["query"] as? String {
+                        log("ChatProvider: Executing approved SQL: \(query.prefix(200))")
+                        try await dbQueue.write { db in
+                            try db.execute(sql: query)
+                        }
+                    } else if tool == "save_knowledge_graph" {
+                        // Forward to the existing KG save handler
+                        log("ChatProvider: Executing approved KG save")
+                        if let nodesArray = opArgs["nodes"] as? [[String: Any]] {
+                            for node in nodesArray {
+                                guard let name = node["name"] as? String,
+                                      let nodeType = node["type"] as? String else { continue }
+                                let description = node["description"] as? String ?? ""
+                                try await dbQueue.write { db in
+                                    try db.execute(sql: """
+                                        INSERT OR REPLACE INTO local_kg_nodes (name, type, description, updatedAt)
+                                        VALUES (?, ?, ?, datetime('now'))
+                                    """, arguments: [name, nodeType, description])
+                                }
+                            }
+                        }
+                        if let edgesArray = opArgs["edges"] as? [[String: Any]] {
+                            for edge in edgesArray {
+                                guard let source = edge["source"] as? String,
+                                      let target = edge["target"] as? String,
+                                      let relation = edge["relation"] as? String else { continue }
+                                try await dbQueue.write { db in
+                                    try db.execute(sql: """
+                                        INSERT OR REPLACE INTO local_kg_edges (source, target, relation, updatedAt)
+                                        VALUES (?, ?, ?, datetime('now'))
+                                    """, arguments: [source, target, relation])
+                                }
+                            }
+                        }
+                    }
+                }
+                log("ChatProvider: Executed \(operations.count) approved observer operations for id=\(activityId)")
+            }
+        } catch {
+            log("ChatProvider: Failed to execute approved observer operations: \(error)")
         }
     }
 
