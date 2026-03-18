@@ -2302,6 +2302,7 @@ class ChatProvider: ObservableObject {
 
         // Analytics: track timing and tool usage
         let queryStartTime = Date()
+        var firstTokenTime: Date?
         var toolNames: [String] = []
         var toolStartTimes: [String: Date] = [:]
         var toolResults: [String: String] = [:]  // Track last result per tool for success/failure
@@ -2332,6 +2333,11 @@ class ChatProvider: ObservableObject {
             // Callbacks for ACP bridge
             let textDeltaHandler: ACPBridge.TextDeltaHandler = { [weak self] delta in
                 Task { @MainActor [weak self] in
+                    if firstTokenTime == nil {
+                        firstTokenTime = Date()
+                        let ttftMs = Int(Date().timeIntervalSince(queryStartTime) * 1000)
+                        log("Chat TTFT: \(ttftMs)ms (session=\(sessionKey ?? "main"))")
+                    }
                     self?.appendToMessage(id: aiMessageId, text: delta)
                 }
             }
@@ -2598,7 +2604,9 @@ class ChatProvider: ObservableObject {
                 await generateSessionTitle(sessionId: sid)
             }
 
-            log("Chat response complete")
+            let totalMs = Int(Date().timeIntervalSince(queryStartTime) * 1000)
+            let ttftMs = firstTokenTime.map { Int($0.timeIntervalSince(queryStartTime) * 1000) }
+            log("Chat response complete (total=\(totalMs)ms, ttft=\(ttftMs.map { "\($0)ms" } ?? "none"), tools=\(toolNames.count), session=\(sessionKey ?? "main"), mode=\(bridgeMode))")
 
             // Persist the ACP session ID so we can resume after app restart
             if !queryResult.sessionId.isEmpty {
@@ -2724,7 +2732,9 @@ class ChatProvider: ObservableObject {
                 }
             }
 
-            logError("Failed to get AI response", error: error)
+            let errorDurationMs = Int(Date().timeIntervalSince(queryStartTime) * 1000)
+            let hadTokens = firstTokenTime != nil
+            logError("Failed to get AI response (after \(errorDurationMs)ms, hadTokens=\(hadTokens), mode=\(bridgeMode))", error: error)
             AnalyticsManager.shared.chatAgentError(error: error.localizedDescription)
 
             // Show error to user (unless they intentionally stopped)
