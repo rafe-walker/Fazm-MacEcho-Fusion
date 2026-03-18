@@ -220,7 +220,7 @@ final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {
         if saved == "staging" {
             return Set(["staging"])
         }
-        return Set()
+        return Set(["beta"])
     }
 
     /// Called when an update will be installed (app may terminate immediately after)
