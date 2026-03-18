@@ -782,22 +782,25 @@ class ChatProvider: ObservableObject {
         // Ensure API keys are fetched before checking availability
         await KeyService.shared.ensureKeys()
 
-        // If builtin mode and bundled key isn't available, try Vertex setup
-        if bridgeMode == "builtin" && (KeyService.shared.anthropicAPIKey ?? "").isEmpty && vertexTokenManager == nil {
+        // Always set up Vertex token manager — Hindsight Memory MCP needs ADC
+        // credentials for Gemini Pro via Vertex AI, regardless of chat mode.
+        if vertexTokenManager == nil {
             let vtm = VertexTokenManager()
             if await vtm.isConfigured {
                 do {
                     let config = try await vtm.setup()
                     vertexTokenManager = vtm
                     await vtm.startRefreshLoop()
-                    log("ChatProvider: Vertex token manager set up on first bridge start (project=\(config.projectId))")
-                    // Recreate bridge now that vertex is ready
-                    acpBridge = createBridge()
+                    log("ChatProvider: Vertex token manager set up (project=\(config.projectId), region=\(config.region))")
+                    // If builtin mode with no Anthropic key, recreate bridge to use Vertex for chat too
+                    if bridgeMode == "builtin" && (KeyService.shared.anthropicAPIKey ?? "").isEmpty {
+                        acpBridge = createBridge()
+                    }
                 } catch {
                     logError("ChatProvider: Vertex setup failed on bridge start", error: error)
                 }
             } else {
-                log("ChatProvider: Vertex env vars not configured, using fallback")
+                log("ChatProvider: Vertex env vars not configured")
             }
         }
 
