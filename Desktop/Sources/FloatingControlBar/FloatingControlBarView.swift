@@ -112,7 +112,6 @@ struct FloatingControlBarView: View {
                 (window as? FloatingControlBarWindow)?.resizeForHover(expanded: false)
             }
         }
-        .background(DraggableAreaView(targetWindow: window))
         .floatingBackground(cornerRadius: isHovering || state.showingAIConversation || state.isVoiceListening ? 20 : 5)
     }
 
