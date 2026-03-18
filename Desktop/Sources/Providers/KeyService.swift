@@ -8,6 +8,7 @@ final class KeyService {
 
     private(set) var anthropicAPIKey: String?
     private(set) var deepgramAPIKey: String?
+    private(set) var geminiAPIKey: String?
     private var hasFetched = false
 
     /// Task that represents the in-flight fetchKeys() call, so callers can await it.
@@ -116,6 +117,7 @@ final class KeyService {
                 struct KeysResponse: Decodable {
                     let anthropic_api_key: String
                     let deepgram_api_key: String
+                    let gemini_api_key: String?
                 }
 
                 let keys = try JSONDecoder().decode(KeysResponse.self, from: data)
@@ -125,8 +127,11 @@ final class KeyService {
                 if !keys.deepgram_api_key.isEmpty {
                     deepgramAPIKey = keys.deepgram_api_key
                 }
+                if let gemini = keys.gemini_api_key, !gemini.isEmpty {
+                    geminiAPIKey = gemini
+                }
                 hasFetched = true
-                log("KeyService: fetched keys (anthropic=\(anthropicAPIKey != nil), deepgram=\(deepgramAPIKey != nil))")
+                log("KeyService: fetched keys (anthropic=\(anthropicAPIKey != nil), deepgram=\(deepgramAPIKey != nil), gemini=\(geminiAPIKey != nil))")
                 return
             } catch {
                 if attempt < 2 {
