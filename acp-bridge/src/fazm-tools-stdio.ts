@@ -449,9 +449,10 @@ async function handleJsonRpc(
 
       if (toolName === "execute_sql") {
         const query = args.query as string;
-        if (currentMode === "ask") {
-          const normalized = query.trim().toUpperCase();
-          if (!normalized.startsWith("SELECT")) {
+        const normalized = query.trim().toUpperCase();
+        const isWriteQuery = !normalized.startsWith("SELECT");
+
+        if (currentMode === "ask" && isWriteQuery) {
             if (!isNotification) {
               send({
                 jsonrpc: "2.0",
@@ -467,8 +468,43 @@ async function handleJsonRpc(
               });
             }
             return;
+        }
+
+        // Observer mode: writes require user approval — store as pending card
+        if (isObserver && isWriteQuery) {
+          // Don't intercept observer_activity INSERTs (that's how the observer creates cards)
+          const isObserverActivityWrite = normalized.includes("OBSERVER_ACTIVITY");
+          if (!isObserverActivityWrite) {
+            // Store the pending write operation in an approval card
+            const cardContent = JSON.stringify({
+              title: "Observer wants to update",
+              body: describeSqlWrite(query),
+              pending_operations: [{ tool: "execute_sql", args: { query } }],
+              buttons: [
+                { label: "Approve", action: "approve" },
+                { label: "Dismiss", action: "dismiss" },
+              ],
+            });
+            const insertCard = `INSERT INTO observer_activity (id, type, content, status, createdAt) VALUES (abs(random()), 'approval_request', '${cardContent.replace(/'/g, "''")}', 'pending', datetime('now'))`;
+            await requestSwiftTool("execute_sql", { query: insertCard });
+            if (!isNotification) {
+              send({
+                jsonrpc: "2.0",
+                id,
+                result: {
+                  content: [
+                    {
+                      type: "text",
+                      text: "Write operation queued for user approval. A card has been shown to the user. Continue with other tasks — do NOT retry this write.",
+                    },
+                  ],
+                },
+              });
+            }
+            return;
           }
         }
+
         const result = await requestSwiftTool("execute_sql", { query });
         if (!isNotification) {
           send({
@@ -565,6 +601,38 @@ async function handleJsonRpc(
                 type: "text",
                 text: content ?? `Skill '${name}' not found. Check the name matches one listed in <available_skills>.`,
               }],
+            },
+          });
+        }
+      } else if (isObserver && toolName === "save_knowledge_graph") {
+        // Observer mode: KG writes require user approval
+        const nodes = (args.nodes as Array<Record<string, unknown>>) || [];
+        const edges = (args.edges as Array<Record<string, unknown>>) || [];
+        const nodesSummary = nodes.map((n: Record<string, unknown>) => `${n.name} (${n.type})`).join(", ");
+        const edgesSummary = edges.map((e: Record<string, unknown>) => `${e.source} → ${e.target} (${e.relation})`).join(", ");
+        const body = `Save to knowledge graph:\n• Nodes: ${nodesSummary || "none"}\n• Edges: ${edgesSummary || "none"}`;
+        const cardContent = JSON.stringify({
+          title: "Observer wants to update knowledge graph",
+          body,
+          pending_operations: [{ tool: "save_knowledge_graph", args }],
+          buttons: [
+            { label: "Approve", action: "approve" },
+            { label: "Dismiss", action: "dismiss" },
+          ],
+        });
+        const insertCard = `INSERT INTO observer_activity (id, type, content, status, createdAt) VALUES (abs(random()), 'approval_request', '${cardContent.replace(/'/g, "''")}', 'pending', datetime('now'))`;
+        await requestSwiftTool("execute_sql", { query: insertCard });
+        if (!isNotification) {
+          send({
+            jsonrpc: "2.0",
+            id,
+            result: {
+              content: [
+                {
+                  type: "text",
+                  text: "Knowledge graph update queued for user approval. A card has been shown to the user. Continue with other tasks — do NOT retry this write.",
+                },
+              ],
             },
           });
         }
