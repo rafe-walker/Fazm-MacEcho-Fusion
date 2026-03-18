@@ -112,9 +112,15 @@ actor ACPBridge {
   var onAuthTimeoutGlobal: AuthTimeoutHandler?
   /// Called when the observer session completes a batch and new cards may be available
   var onObserverPoll: (() -> Void)?
+  /// Global tool call handler for background sessions (observer) — processes tool_use even when no query is active
+  var onBackgroundToolCall: ToolCallHandler?
 
   func setObserverPollHandler(_ handler: @escaping @Sendable () -> Void) {
     self.onObserverPoll = handler
+  }
+
+  func setBackgroundToolCallHandler(_ handler: @escaping ToolCallHandler) {
+    self.onBackgroundToolCall = handler
   }
 
   func setGlobalAuthHandlers(
@@ -796,6 +802,23 @@ actor ACPBridge {
       // Always handle immediately — observer runs independently of any active query
       onObserverPoll?()
       return
+    case .toolUse(let callId, let name, let input):
+      // If no active query is waiting, handle tool calls from background sessions (observer)
+      if messageContinuation == nil, let handler = onBackgroundToolCall {
+        Task {
+          let result = await handler(callId, name, input)
+          let resultDict: [String: Any] = [
+            "type": "tool_result",
+            "callId": callId,
+            "result": result,
+          ]
+          if let resultData = try? JSONSerialization.data(withJSONObject: resultDict),
+             let resultString = String(data: resultData, encoding: .utf8) {
+            self.sendLine(resultString)
+          }
+        }
+        return
+      }
     default:
       break
     }
