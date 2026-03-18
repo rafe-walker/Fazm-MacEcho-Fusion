@@ -1742,6 +1742,9 @@ class ChatProvider: ObservableObject {
         if workingDirectory == nil, !aiChatWorkingDirectory.isEmpty {
             workingDirectory = aiChatWorkingDirectory
         }
+
+        // Pre-load floating chat from DB so PTT doesn't block on first invocation
+        await restoreFloatingChatIfNeeded()
     }
 
     /// Reinitialize after settings change
