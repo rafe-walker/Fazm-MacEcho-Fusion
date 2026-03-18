@@ -88,6 +88,17 @@ else
     echo "Warning: mcp-server-macos-use not found at $MCP_REPO — skipping"
 fi
 
+# Build and bundle whatsapp-mcp
+echo "Building whatsapp-mcp..."
+MCP_WHATSAPP="$HOME/whatsapp-mcp-skill-macos"
+if [ -d "$MCP_WHATSAPP" ]; then
+    swift build -c release --package-path "$MCP_WHATSAPP"
+    cp "$MCP_WHATSAPP/.build/release/whatsapp-mcp" "$APP_BUNDLE/Contents/MacOS/whatsapp-mcp"
+    echo "Bundled whatsapp-mcp"
+else
+    echo "Warning: whatsapp-mcp not found at $MCP_WHATSAPP — skipping"
+fi
+
 # Copy Info.plist
 cp Desktop/Info.plist "$APP_BUNDLE/Contents/Info.plist"
 
