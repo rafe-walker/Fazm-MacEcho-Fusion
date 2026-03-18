@@ -98,6 +98,17 @@ function connectToPipe(): Promise<void> {
   });
 }
 
+/** Notify the bridge that an observer card is ready for immediate display */
+function notifyObserverCardReady(): void {
+  if (pipeConnection) {
+    try {
+      pipeConnection.write(JSON.stringify({ type: "observer_card_ready" }) + "\n");
+    } catch {
+      logErr("Failed to send observer_card_ready notification");
+    }
+  }
+}
+
 async function requestSwiftTool(
   name: string,
   input: Record<string, unknown>
@@ -507,6 +518,7 @@ async function handleJsonRpc(
             });
             const insertCard = `INSERT INTO observer_activity (id, type, content, status, createdAt) VALUES (abs(random()), 'approval_request', '${cardContent.replace(/'/g, "''")}', 'pending', datetime('now'))`;
             await requestSwiftTool("execute_sql", { query: insertCard });
+            notifyObserverCardReady();
             if (!isNotification) {
               send({
                 jsonrpc: "2.0",
