@@ -150,6 +150,11 @@ class SessionRecordingManager {
             self.recorder = recorder
             self.isStarted = true
 
+            // Wire up Gemini analysis: copy each chunk before upload deletes it
+            await recorder.setOnChunkReady { info in
+                await GeminiAnalysisService.shared.handleChunk(info)
+            }
+
             do {
                 try await recorder.start()
                 // Start paused — activity observers will resume when user interacts
