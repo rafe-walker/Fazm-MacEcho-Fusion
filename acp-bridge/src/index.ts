@@ -186,6 +186,7 @@ async function startHindsight(): Promise<boolean> {
     HINDSIGHT_API_EMBEDDINGS_PROVIDER: "local",
     HINDSIGHT_API_RERANKER_PROVIDER: "local",
     HINDSIGHT_API_DATABASE_URL: "pg0://fazm",
+    HINDSIGHT_API_SKIP_LLM_VERIFICATION: "true",
   };
   hindsightProcess = spawn(hindsightPython, [
     "-m", "hindsight_api.main",
