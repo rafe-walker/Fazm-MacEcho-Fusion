@@ -357,6 +357,60 @@ workflows:
           echo "All required env vars verified in bundled .env"
           echo "App bundle created: $APP_BUNDLE"
 
+      - name: Create arch-specific ZIPs for stub installer
+        script: |
+          # Create arch-specific app bundles by replacing the universal binary
+          # with the single-arch binary, then ZIP each one
+          ARM64_BINARY="/tmp/Fazm-arm64"
+          X86_64_BINARY="Desktop/.build/x86_64-apple-macosx/release/$BINARY_NAME"
+
+          for ARCH in arm64 x86_64; do
+            echo "Creating $ARCH ZIP..."
+            ARCH_APP="/tmp/Fazm-$ARCH-app"
+            rm -rf "$ARCH_APP"
+            ditto "$APP_BUNDLE" "$ARCH_APP/$APP_NAME.app"
+
+            # Replace universal binary with single-arch
+            if [ "$ARCH" = "arm64" ]; then
+              lipo "$ARCH_APP/$APP_NAME.app/Contents/MacOS/$BINARY_NAME" \
+                -thin arm64 -output "$ARCH_APP/$APP_NAME.app/Contents/MacOS/$BINARY_NAME.thin"
+            else
+              lipo "$ARCH_APP/$APP_NAME.app/Contents/MacOS/$BINARY_NAME" \
+                -thin x86_64 -output "$ARCH_APP/$APP_NAME.app/Contents/MacOS/$BINARY_NAME.thin"
+            fi
+            mv "$ARCH_APP/$APP_NAME.app/Contents/MacOS/$BINARY_NAME.thin" \
+               "$ARCH_APP/$APP_NAME.app/Contents/MacOS/$BINARY_NAME"
+
+            # Also thin mcp-server-macos-use if present
+            MCP_BIN="$ARCH_APP/$APP_NAME.app/Contents/MacOS/mcp-server-macos-use"
+            if [ -f "$MCP_BIN" ] && lipo -info "$MCP_BIN" 2>/dev/null | grep -q "Architectures"; then
+              lipo "$MCP_BIN" -thin "$ARCH" -output "$MCP_BIN.thin" 2>/dev/null && \
+                mv "$MCP_BIN.thin" "$MCP_BIN" || true
+            fi
+
+            # Also thin ffmpeg if present
+            FFMPEG_BIN="$ARCH_APP/$APP_NAME.app/Contents/Resources/Fazm_Fazm.bundle/ffmpeg"
+            if [ -f "$FFMPEG_BIN" ] && lipo -info "$FFMPEG_BIN" 2>/dev/null | grep -q "Architectures"; then
+              lipo "$FFMPEG_BIN" -thin "$ARCH" -output "$FFMPEG_BIN.thin" 2>/dev/null && \
+                mv "$FFMPEG_BIN.thin" "$FFMPEG_BIN" || true
+            fi
+
+            # Also thin node if present
+            NODE_BIN="$ARCH_APP/$APP_NAME.app/Contents/Resources/Fazm_Fazm.bundle/node"
+            if [ -f "$NODE_BIN" ] && lipo -info "$NODE_BIN" 2>/dev/null | grep -q "Architectures"; then
+              lipo "$NODE_BIN" -thin "$ARCH" -output "$NODE_BIN.thin" 2>/dev/null && \
+                mv "$NODE_BIN.thin" "$NODE_BIN" || true
+            fi
+
+            # Create ZIP
+            ditto -c -k --keepParent "$ARCH_APP/$APP_NAME.app" "$BUILD_DIR/Fazm-$ARCH.zip"
+            echo "Created $BUILD_DIR/Fazm-$ARCH.zip ($(du -h "$BUILD_DIR/Fazm-$ARCH.zip" | cut -f1))"
+            rm -rf "$ARCH_APP"
+          done
+
+          echo "ARCH_ARM64_ZIP=$BUILD_DIR/Fazm-arm64.zip" >> $CM_ENV
+          echo "ARCH_X86_64_ZIP=$BUILD_DIR/Fazm-x86_64.zip" >> $CM_ENV
+
       - name: Sign app
         script: |
           xattr -cr "$APP_BUNDLE"
@@ -725,10 +779,166 @@ workflows:
           ./scripts/deploy-appcast.sh
           echo "Appcast deployed to GitHub release"
 
+      - name: Upload arch-specific ZIPs to GCS
+        script: |
+          set -e
+          # Decode GCP service account key
+          echo "$GCP_SERVICE_ACCOUNT_KEY" | base64 --decode > /tmp/gcp-sa-key.json
+          gcloud auth activate-service-account --key-file=/tmp/gcp-sa-key.json
+          rm /tmp/gcp-sa-key.json
+
+          BUCKET="fazm-releases"
+          PREFIX="desktop/$VERSION"
+          BASE_URL="https://storage.googleapis.com/$BUCKET"
+
+          # Upload arch-specific ZIPs
+          gcloud storage cp "$ARCH_ARM64_ZIP"  "gs://$BUCKET/$PREFIX/Fazm-arm64.zip"
+          gcloud storage cp "$ARCH_X86_64_ZIP" "gs://$BUCKET/$PREFIX/Fazm-x86_64.zip"
+
+          # Compute SHA256 and sizes
+          ARM64_SHA256=$(shasum -a 256 "$ARCH_ARM64_ZIP" | awk '{print $1}')
+          X86_64_SHA256=$(shasum -a 256 "$ARCH_X86_64_ZIP" | awk '{print $1}')
+          ARM64_SIZE=$(stat -f%z "$ARCH_ARM64_ZIP" 2>/dev/null || stat -c%s "$ARCH_ARM64_ZIP")
+          X86_64_SIZE=$(stat -f%z "$ARCH_X86_64_ZIP" 2>/dev/null || stat -c%s "$ARCH_X86_64_ZIP")
+
+          # Generate and upload latest.json manifest
+          cat > /tmp/fazm-latest.json << EOF
+          {
+            "version": "$VERSION",
+            "arm64": {
+              "url": "$BASE_URL/$PREFIX/Fazm-arm64.zip",
+              "size": $ARM64_SIZE,
+              "sha256": "$ARM64_SHA256"
+            },
+            "x86_64": {
+              "url": "$BASE_URL/$PREFIX/Fazm-x86_64.zip",
+              "size": $X86_64_SIZE,
+              "sha256": "$X86_64_SHA256"
+            }
+          }
+          EOF
+
+          gcloud storage cp /tmp/fazm-latest.json "gs://$BUCKET/$PREFIX/latest.json"
+          gcloud storage cp /tmp/fazm-latest.json "gs://$BUCKET/desktop/latest.json" \
+              --cache-control="no-cache, max-age=0"
+
+          echo "Uploaded arch-specific ZIPs and manifest to GCS"
+          echo "  arm64:  $BASE_URL/$PREFIX/Fazm-arm64.zip ($ARM64_SIZE bytes)"
+          echo "  x86_64: $BASE_URL/$PREFIX/Fazm-x86_64.zip ($X86_64_SIZE bytes)"
+          echo "  manifest: $BASE_URL/desktop/latest.json"
+
+      - name: Build stub installer and create DMG
+        script: |
+          set -e
+          unset TOOLCHAINS
+
+          # Build universal stub installer
+          echo "Building stub installer (arm64)..."
+          xcrun swift build -c release --package-path Installer --triple arm64-apple-macosx
+          echo "Building stub installer (x86_64)..."
+          xcrun swift build -c release --package-path Installer --triple x86_64-apple-macosx
+
+          # Create universal binary
+          INSTALLER_ARM64="Installer/.build/arm64-apple-macosx/release/FazmInstaller"
+          INSTALLER_X86="Installer/.build/x86_64-apple-macosx/release/FazmInstaller"
+          mkdir -p /tmp/installer-bundle
+
+          lipo -create "$INSTALLER_ARM64" "$INSTALLER_X86" -output /tmp/installer-bundle/FazmInstaller
+
+          # Create installer .app bundle
+          INSTALLER_APP="$BUILD_DIR/Install Fazm.app"
+          mkdir -p "$INSTALLER_APP/Contents/MacOS"
+          mkdir -p "$INSTALLER_APP/Contents/Resources"
+
+          cp /tmp/installer-bundle/FazmInstaller "$INSTALLER_APP/Contents/MacOS/FazmInstaller"
+          cp Installer/Info.plist "$INSTALLER_APP/Contents/Info.plist"
+          [ -f "fazm_icon.icns" ] && cp fazm_icon.icns "$INSTALLER_APP/Contents/Resources/FazmIcon.icns"
+
+          # Copy SPM resource bundle if it exists
+          INSTALLER_BUILD_DIR="Installer/.build/arm64-apple-macosx/release"
+          INSTALLER_RESOURCE_BUNDLE="$INSTALLER_BUILD_DIR/FazmInstaller_FazmInstaller.bundle"
+          if [ -d "$INSTALLER_RESOURCE_BUNDLE" ]; then
+            cp -R "$INSTALLER_RESOURCE_BUNDLE" "$INSTALLER_APP/Contents/Resources/"
+          fi
+
+          printf "APPL????" > "$INSTALLER_APP/Contents/PkgInfo"
+
+          # Update version in Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" \
+            "$INSTALLER_APP/Contents/Info.plist" 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $VERSION" \
+            "$INSTALLER_APP/Contents/Info.plist"
+
+          # Sign installer
+          codesign --force --options runtime --timestamp \
+            --sign "$SIGN_IDENTITY" \
+            "$INSTALLER_APP"
+
+          # Create stub installer DMG
+          STUB_DMG="$BUILD_DIR/Fazm-Installer.dmg"
+          STUB_STAGING="/tmp/fazm-stub-dmg-$$"
+          mkdir -p "$STUB_STAGING"
+          ditto "$INSTALLER_APP" "$STUB_STAGING/Install Fazm.app"
+
+          # Add volume icon
+          ICNS="$STUB_STAGING/Install Fazm.app/Contents/Resources/FazmIcon.icns"
+          if [ -f "$ICNS" ]; then
+            cp "$ICNS" "$STUB_STAGING/.VolumeIcon.icns"
+            SetFile -c icnC "$STUB_STAGING/.VolumeIcon.icns" 2>/dev/null || true
+          fi
+
+          hdiutil create \
+            -volname "Install Fazm" \
+            -srcfolder "$STUB_STAGING" \
+            -ov -format UDZO \
+            -imagekey zlib-level=9 \
+            "$STUB_DMG"
+
+          rm -rf "$STUB_STAGING" /tmp/installer-bundle
+
+          # Sign and notarize stub DMG
+          codesign --force --sign "$SIGN_IDENTITY" "$STUB_DMG"
+
+          mkdir -p ~/private_keys
+          PRIVATE_KEY_PATH=~/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_IDENTIFIER}.p8
+          echo -e "$APP_STORE_CONNECT_PRIVATE_KEY" > "$PRIVATE_KEY_PATH"
+
+          RESULT=$(xcrun notarytool submit "$STUB_DMG" \
+            --key "$PRIVATE_KEY_PATH" \
+            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            --issuer "$APP_STORE_CONNECT_ISSUER_ID" \
+            --wait \
+            --output-format json)
+
+          STATUS=$(echo "$RESULT" | python3 -c \
+            "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || echo "")
+
+          if [ "$STATUS" != "Accepted" ]; then
+            echo "WARNING: Stub DMG notarization failed: $STATUS (non-fatal)"
+          else
+            xcrun stapler staple "$STUB_DMG"
+            echo "Stub DMG notarized and stapled"
+          fi
+
+          echo "STUB_DMG=$STUB_DMG" >> $CM_ENV
+          echo "Stub installer DMG: $(du -h "$STUB_DMG" | cut -f1)"
+
+      - name: Upload stub installer to GitHub release
+        script: |
+          if [ -f "$STUB_DMG" ]; then
+            gh release upload "$CM_TAG" "$STUB_DMG" \
+              --repo "$GITHUB_REPO" \
+              --clobber
+            echo "Stub installer DMG uploaded to GitHub release"
+          fi
+
     artifacts:
       - build/*.app
       - build/*.dmg
       - build/*.zip
+      - build/Fazm-arm64.zip
+      - build/Fazm-x86_64.zip
+      - build/Fazm-Installer.dmg
     publishing:
       email:
         recipients:
