@@ -167,8 +167,32 @@ struct AIResponseView: View {
                     // If no streaming data arrives within 60s, the query is failing silently
                     // (e.g. credit exhaustion, bridge crash, backend unreachable).
                     // Stop the bridge so sendMessage() returns and error handling kicks in.
+                    // But don't trigger if tool calls are actively running — those can
+                    // legitimately take minutes (e.g. Terminal commands).
                     try? await Task.sleep(for: .seconds(60))
                     guard !Task.isCancelled else { return }
+                    let hasRunningTools = currentMessage?.contentBlocks.contains(where: {
+                        if case .toolCall(_, _, .running, _, _, _) = $0 { return true }
+                        return false
+                    }) ?? false
+                    if hasRunningTools {
+                        // Tools are still running — don't flag as hanging.
+                        // Re-check every 30s in case tools finish but model stops responding.
+                        while !Task.isCancelled {
+                            try? await Task.sleep(for: .seconds(30))
+                            guard !Task.isCancelled else { return }
+                            let stillRunning = await MainActor.run {
+                                currentMessage?.contentBlocks.contains(where: {
+                                    if case .toolCall(_, _, .running, _, _, _) = $0 { return true }
+                                    return false
+                                }) ?? false
+                            }
+                            if !stillRunning { break }
+                        }
+                        // Tools finished — give the model 60s more to respond
+                        try? await Task.sleep(for: .seconds(60))
+                        guard !Task.isCancelled else { return }
+                    }
                     isHanging = true
                     await MainActor.run {
                         onStopAgent?()
@@ -209,7 +233,11 @@ struct AIResponseView: View {
                     ProgressView()
                         .scaleEffect(0.6)
                         .frame(width: 16, height: 16)
-                    Text("thinking")
+                    let hasRunningTools = currentMessage?.contentBlocks.contains(where: {
+                        if case .toolCall(_, _, .running, _, _, _) = $0 { return true }
+                        return false
+                    }) ?? false
+                    Text(hasRunningTools ? "using tools" : "thinking")
                         .scaledFont(size: 14)
                         .foregroundColor(.secondary)
                 }
