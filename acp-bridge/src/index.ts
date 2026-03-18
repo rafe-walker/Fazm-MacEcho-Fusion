@@ -166,23 +166,30 @@ async function startHindsight(): Promise<boolean> {
   }
 
   logErr(`Hindsight: starting server (vertexai, project=${vertexProject}, region=${vertexRegion}, adc=${adcPath})...`);
+  // Use a clean environment to avoid conflicting Google auth vars
+  // (e.g. CLOUD_ML_REGION, ANTHROPIC_VERTEX_PROJECT_ID) from the parent
+  const hindsightEnv: Record<string, string> = {
+    PATH: process.env.PATH || "/usr/bin:/bin",
+    HOME: process.env.HOME || "",
+    TMPDIR: process.env.TMPDIR || "/tmp",
+    LANG: process.env.LANG || "en_US.UTF-8",
+    GOOGLE_APPLICATION_CREDENTIALS: adcPath,
+    HINDSIGHT_API_LLM_PROVIDER: "vertexai",
+    HINDSIGHT_API_LLM_MODEL: "gemini-2.5-pro",
+    HINDSIGHT_API_LLM_VERTEXAI_PROJECT_ID: vertexProject,
+    HINDSIGHT_API_LLM_VERTEXAI_REGION: vertexRegion,
+    HINDSIGHT_API_EMBEDDINGS_PROVIDER: "local",
+    HINDSIGHT_API_RERANKER_PROVIDER: "local",
+    HINDSIGHT_API_DATABASE_URL: "pg0://fazm",
+    HINDSIGHT_API_SKIP_LLM_VERIFICATION: "true",
+  };
   hindsightProcess = spawn(hindsightPython, [
     "-m", "hindsight_api.main",
     "--host", "127.0.0.1",
     "--port", String(HINDSIGHT_PORT),
     "--log-level", "warning",
   ], {
-    env: {
-      ...process.env,
-      HINDSIGHT_API_LLM_PROVIDER: "vertexai",
-      HINDSIGHT_API_LLM_MODEL: "gemini-2.5-pro",
-      HINDSIGHT_API_LLM_VERTEXAI_PROJECT_ID: vertexProject,
-      HINDSIGHT_API_LLM_VERTEXAI_REGION: vertexRegion,
-      GOOGLE_APPLICATION_CREDENTIALS: adcPath,
-      HINDSIGHT_API_EMBEDDINGS_PROVIDER: "local",
-      HINDSIGHT_API_RERANKER_PROVIDER: "local",
-      HINDSIGHT_API_DATABASE_URL: "pg0://fazm",
-    },
+    env: hindsightEnv,
     stdio: ["ignore", "pipe", "pipe"],
     detached: true,
   });
