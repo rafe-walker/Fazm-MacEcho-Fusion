@@ -92,7 +92,7 @@ struct SettingsContentView: View {
     @AppStorage("conversationsCompactView") private var conversationsCompactView = true
 
     // AI Chat settings
-    @AppStorage("askModeEnabled") private var askModeEnabled = false
+
     @AppStorage("claudeMdEnabled") private var claudeMdEnabled = true
     @AppStorage("projectClaudeMdEnabled") private var projectClaudeMdEnabled = true
     @AppStorage("aiChatWorkingDirectory") private var aiChatWorkingDirectory: String = ""
@@ -423,32 +423,6 @@ struct SettingsContentView: View {
                             .foregroundColor(.red)
                         }
                     }
-                }
-            }
-
-            // Ask Mode card
-            settingsCard(settingId: "aichat.askmode") {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Image(systemName: "bubble.left.and.bubble.right")
-                            .scaledFont(size: 16)
-                            .foregroundColor(FazmColors.textTertiary)
-
-                        Text("Ask Mode")
-                            .scaledFont(size: 15, weight: .semibold)
-                            .foregroundColor(FazmColors.textPrimary)
-
-                        Spacer()
-
-                        Toggle("", isOn: $askModeEnabled)
-                            .toggleStyle(.switch)
-                            .controlSize(.small)
-                            .labelsHidden()
-                    }
-
-                    Text("When enabled, shows an Ask/Act toggle in the chat. Ask mode restricts the AI to read-only actions. When disabled, the AI always runs in Act mode.")
-                        .scaledFont(size: 12)
-                        .foregroundColor(FazmColors.textTertiary)
                 }
             }
 
@@ -1240,7 +1214,7 @@ struct SettingsContentView: View {
 
     private var preferencesSubsection: some View {
         VStack(spacing: 20) {
-            // Ask Fazm floating bar toggle
+            // Floating bar visibility toggle
             settingsCard(settingId: "advanced.preferences.askomi") {
                 HStack(spacing: 16) {
                     Circle()
@@ -1249,7 +1223,7 @@ struct SettingsContentView: View {
                         .shadow(color: showAskFazmBar ? FazmColors.success.opacity(0.5) : .clear, radius: 6)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Ask Fazm")
+                        Text("Floating Bar Visibility")
                             .scaledFont(size: 16, weight: .semibold)
                             .foregroundColor(FazmColors.textPrimary)
 
