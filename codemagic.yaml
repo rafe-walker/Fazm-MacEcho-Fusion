@@ -802,21 +802,24 @@ workflows:
           X86_64_SIZE=$(stat -f%z "$ARCH_X86_64_ZIP" 2>/dev/null || stat -c%s "$ARCH_X86_64_ZIP")
 
           # Generate and upload latest.json manifest
-          cat > /tmp/fazm-latest.json << EOF
-          {
-            "version": "$VERSION",
-            "arm64": {
-              "url": "$BASE_URL/$PREFIX/Fazm-arm64.zip",
-              "size": $ARM64_SIZE,
-              "sha256": "$ARM64_SHA256"
-            },
-            "x86_64": {
-              "url": "$BASE_URL/$PREFIX/Fazm-x86_64.zip",
-              "size": $X86_64_SIZE,
-              "sha256": "$X86_64_SHA256"
-            }
+          python3 -c "
+          import json
+          manifest = {
+              'version': '$VERSION',
+              'arm64': {
+                  'url': '$BASE_URL/$PREFIX/Fazm-arm64.zip',
+                  'size': int('$ARM64_SIZE'),
+                  'sha256': '$ARM64_SHA256'
+              },
+              'x86_64': {
+                  'url': '$BASE_URL/$PREFIX/Fazm-x86_64.zip',
+                  'size': int('$X86_64_SIZE'),
+                  'sha256': '$X86_64_SHA256'
+              }
           }
-          EOF
+          with open('/tmp/fazm-latest.json', 'w') as f:
+              json.dump(manifest, f, indent=2)
+          "
 
           gcloud storage cp /tmp/fazm-latest.json "gs://$BUCKET/$PREFIX/latest.json"
           gcloud storage cp /tmp/fazm-latest.json "gs://$BUCKET/desktop/latest.json" \
