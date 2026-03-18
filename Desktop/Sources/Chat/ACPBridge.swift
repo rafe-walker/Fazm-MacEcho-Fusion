@@ -584,6 +584,10 @@ actor ACPBridge {
 
       case .toolUseSummary(let summary):
         onStatusEvent(.toolUseSummary(summary: summary))
+
+      case .observerPoll:
+        // Handled immediately in deliverMessage(); should never reach here
+        break
       }
     }
   }
