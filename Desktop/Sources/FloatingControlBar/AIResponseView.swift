@@ -33,6 +33,7 @@ struct AIResponseView: View {
     var onReorderQueue: ((IndexSet, Int) -> Void)?
     var onStopAgent: (() -> Void)?
     var onConnectClaude: (() -> Void)?
+    var onObserverCardAction: ((Int64, String) -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -314,6 +315,17 @@ struct AIResponseView: View {
                 case .discoveryCard(_, let title, let summary, let fullText):
                     DiscoveryCard(title: title, summary: summary, fullText: fullText)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                case .observerCard(_, let activityId, let type, let content, let buttons):
+                    ObserverCardView(
+                        activityId: activityId,
+                        type: type,
+                        content: content,
+                        buttons: buttons,
+                        onAction: { id, action in
+                            handleObserverCardAction(activityId: id, action: action)
+                        }
+                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         } else if !message.text.isEmpty {
@@ -322,6 +334,10 @@ struct AIResponseView: View {
                 .environment(\.compactCodeBlocks, true)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+
+    private func handleObserverCardAction(activityId: Int64, action: String) {
+        onObserverCardAction?(activityId, action)
     }
 
     // MARK: - Chat History
