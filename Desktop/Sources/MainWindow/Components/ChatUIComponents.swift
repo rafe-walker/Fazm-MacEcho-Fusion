@@ -336,6 +336,8 @@ struct ObserverCardView: View {
     let buttons: [ObserverCardButton]
     var onAction: ((Int64, String) -> Void)?
 
+    @State private var selectedAction: String? = nil
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Icon + label
@@ -359,6 +361,10 @@ struct ObserverCardView: View {
                 HStack(spacing: 8) {
                     ForEach(buttons) { button in
                         Button {
+                            guard selectedAction == nil else { return }
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selectedAction = button.action
+                            }
                             onAction?(activityId, button.action)
                         } label: {
                             Text(button.label)
@@ -367,8 +373,10 @@ struct ObserverCardView: View {
                                 .padding(.vertical, 5)
                         }
                         .buttonStyle(.plain)
-                        .background(buttonBackground(for: button.action))
+                        .background(buttonBackgroundResolved(for: button.action))
                         .cornerRadius(6)
+                        .opacity(selectedAction != nil && selectedAction != button.action ? 0.4 : 1.0)
+                        .disabled(selectedAction != nil)
                     }
                 }
             }
@@ -415,7 +423,20 @@ struct ObserverCardView: View {
         }
     }
 
-    private func buttonBackground(for action: String) -> Color {
+    private func buttonBackgroundResolved(for action: String) -> Color {
+        if let selected = selectedAction {
+            // After click: selected button gets stronger highlight, other fades
+            if action == selected {
+                switch action {
+                case "approve": return FazmColors.purplePrimary.opacity(0.5)
+                case "dismiss": return Color.white.opacity(0.15)
+                default: return Color.white.opacity(0.2)
+                }
+            } else {
+                return Color.white.opacity(0.04)
+            }
+        }
+        // Default (before any click)
         switch action {
         case "approve": return FazmColors.purplePrimary.opacity(0.3)
         case "dismiss": return Color.white.opacity(0.08)
