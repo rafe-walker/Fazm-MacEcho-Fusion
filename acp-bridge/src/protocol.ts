@@ -206,6 +206,11 @@ export interface ToolUseSummaryMessage {
   precedingToolUseIds: string[];
 }
 
+/** Observer session completed a batch — Swift should poll observer_activity for new cards */
+export interface ObserverPollMessage {
+  type: "observer_poll";
+}
+
 export type OutboundMessage =
   | InitMessage
   | TextDeltaMessage
@@ -225,4 +230,5 @@ export type OutboundMessage =
   | TaskStartedMessage
   | TaskNotificationMessage
   | ToolProgressMessage
-  | ToolUseSummaryMessage;
+  | ToolUseSummaryMessage
+  | ObserverPollMessage;
