@@ -468,33 +468,9 @@ class AnalyticsManager {
         PostHogManager.shared.chatCleared()
     }
 
-    func chatSessionCreated() {
-        PostHogManager.shared.track("chat_session_created", properties: [:])
-    }
-
-    func chatSessionDeleted() {
-        PostHogManager.shared.track("chat_session_deleted", properties: [:])
-    }
-
     func messageRated(rating: Int) {
         let ratingString = rating == 1 ? "thumbs_up" : "thumbs_down"
         PostHogManager.shared.track("message_rated", properties: ["rating": ratingString])
-    }
-
-    func initialMessageGenerated(hasApp: Bool) {
-        PostHogManager.shared.track("initial_message_generated", properties: ["has_app": hasApp])
-    }
-
-    func sessionTitleGenerated() {
-        PostHogManager.shared.track("session_title_generated", properties: [:])
-    }
-
-    func chatStarredFilterToggled(enabled: Bool) {
-        PostHogManager.shared.track("chat_starred_filter_toggled", properties: ["enabled": enabled])
-    }
-
-    func sessionRenamed() {
-        PostHogManager.shared.track("session_renamed", properties: [:])
     }
 
     // MARK: - Claude Agent Events
@@ -755,9 +731,6 @@ class AnalyticsManager {
 
         // -- AI Chat Mode --
         props["chat_bridge_mode"] = ud.string(forKey: "chatBridgeMode") ?? "agentSDK"
-
-        // -- UI Preferences --
-        props["multi_chat_enabled"] = ud.bool(forKey: "multiChatEnabled")
 
         // -- Launch at Login --
         props["launch_at_login_enabled"] = LaunchAtLoginManager.shared.isEnabled
