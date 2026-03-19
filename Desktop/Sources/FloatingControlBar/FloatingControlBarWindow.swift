@@ -1505,26 +1505,14 @@ class FloatingControlBarManager {
         // center instead of where it was before the chat opened.
         window.savePreChatCenterIfNeeded()
 
-<<<<<<< Updated upstream
-        // Restore floating chat from DB before showing conversation so history is visible immediately.
-=======
         // Eagerly restore floating chat messages from local DB before showing conversation.
         // Must complete before showAIConversation() so the history check works.
->>>>>>> Stashed changes
         Task { @MainActor in
             await provider.restoreFloatingChatIfNeeded()
             if window.state.chatHistory.isEmpty && !provider.messages.isEmpty {
                 window.state.loadHistory(from: provider.messages)
             }
 
-<<<<<<< Updated upstream
-            window.state.clearLastConversation()
-            window.state.aiInputText = query
-            window.showAIConversation()
-            window.state.aiInputText = query
-            window.orderFrontRegardless()
-
-=======
             // Show the input view with the transcription pre-filled (user can edit before sending)
             window.state.clearLastConversation()
             window.state.aiInputText = query
@@ -1534,7 +1522,6 @@ class FloatingControlBarManager {
             window.orderFrontRegardless()
 
             // Focus the input field so user can immediately edit or press Enter to send
->>>>>>> Stashed changes
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 window.focusInputField()
             }
