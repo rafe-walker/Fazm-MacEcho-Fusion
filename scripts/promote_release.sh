@@ -66,3 +66,22 @@ else
     echo "$BODY" | python3 -m json.tool 2>/dev/null || echo "$BODY"
     exit 1
 fi
+
+# When promoted to beta, update desktop/latest.json on GCS so the stub
+# installer serves this version to new users.
+NEW_CHANNEL=$(echo "$BODY" | python3 -c "import json,sys; print(json.load(sys.stdin).get('new_channel',''))" 2>/dev/null)
+if [ "$NEW_CHANNEL" = "beta" ]; then
+    # Extract version from tag: v1.0.1+65-macos-staging -> 1.0.1
+    VERSION=$(echo "$TAG" | sed 's/^v//' | sed 's/+.*//')
+    BUCKET="fazm-prod-releases"
+
+    echo ""
+    echo "Updating desktop/latest.json to v$VERSION..."
+    if gcloud storage cp "gs://$BUCKET/desktop/$VERSION/latest.json" "gs://$BUCKET/desktop/latest.json" \
+        --cache-control="no-cache, max-age=0" 2>/dev/null; then
+        echo "✓ desktop/latest.json updated — new installs will get v$VERSION"
+    else
+        echo "⚠ Failed to update desktop/latest.json. Update manually:"
+        echo "  gcloud storage cp gs://$BUCKET/desktop/$VERSION/latest.json gs://$BUCKET/desktop/latest.json --cache-control='no-cache, max-age=0'"
+    fi
+fi
