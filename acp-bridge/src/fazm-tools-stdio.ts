@@ -506,10 +506,13 @@ async function handleJsonRpc(
           // Don't intercept observer_activity INSERTs (that's how the observer creates cards)
           const isObserverActivityWrite = normalized.includes("OBSERVER_ACTIVITY");
           if (!isObserverActivityWrite) {
+            // Use the observer's description if provided, fall back to programmatic summary
+            const observerDescription = args.description as string | undefined;
+            const body = observerDescription || describeSqlWrite(query);
             // Store the pending write operation in an approval card
             const cardContent = JSON.stringify({
-              title: "Observer wants to update",
-              body: describeSqlWrite(query),
+              title: "Database update",
+              body,
               pending_operations: [{ tool: "execute_sql", args: { query } }],
               buttons: [
                 { label: "Approve", action: "approve" },
@@ -638,13 +641,20 @@ async function handleJsonRpc(
         }
       } else if (isObserver && toolName === "save_knowledge_graph") {
         // Observer mode: KG writes require user approval
+        // Use the observer's description if provided, fall back to programmatic summary
+        const observerDescription = args.description as string | undefined;
         const nodes = (args.nodes as Array<Record<string, unknown>>) || [];
         const edges = (args.edges as Array<Record<string, unknown>>) || [];
-        const nodesSummary = nodes.map((n: Record<string, unknown>) => `${n.name || n.label || n.id} (${n.type || n.node_type || "entity"})`).join(", ");
-        const edgesSummary = edges.map((e: Record<string, unknown>) => `${e.source || e.source_id} → ${e.target || e.target_id} (${e.relation || e.label})`).join(", ");
-        const body = `Save to knowledge graph:\n• Nodes: ${nodesSummary || "none"}\n• Edges: ${edgesSummary || "none"}`;
+        let body: string;
+        if (observerDescription) {
+          body = observerDescription;
+        } else {
+          const nodesSummary = nodes.map((n: Record<string, unknown>) => `${n.name || n.label || n.id} (${n.type || n.node_type || "entity"})`).join(", ");
+          const edgesSummary = edges.map((e: Record<string, unknown>) => `${e.source || e.source_id} → ${e.target || e.target_id} (${e.relation || e.label})`).join(", ");
+          body = `Save to knowledge graph:\n• Nodes: ${nodesSummary || "none"}\n• Edges: ${edgesSummary || "none"}`;
+        }
         const cardContent = JSON.stringify({
-          title: "Observer wants to update knowledge graph",
+          title: "Update knowledge graph",
           body,
           pending_operations: [{ tool: "save_knowledge_graph", args }],
           buttons: [
