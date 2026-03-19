@@ -35,18 +35,20 @@ struct FloatingBackgroundModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background(
-                Group {
-                    if useSolid {
-                        Color(nsColor: NSColor(white: 0.12, alpha: 1.0))
-                    } else {
-                        VisualEffectView(material: .fullScreenUI, blendingMode: .behindWindow, alphaValue: 0.6)
-                    }
+                ZStack {
+                    VisualEffectView(material: .fullScreenUI, blendingMode: .behindWindow, alphaValue: 0.6)
+                        .opacity(useSolid ? 0 : 1)
+                    Color(nsColor: NSColor(white: 0.12, alpha: 1.0))
+                        .opacity(useSolid ? 1 : 0)
                 }
+                .animation(.easeInOut(duration: 0.25), value: useSolid)
             )
             .cornerRadius(cornerRadius)
+            .animation(.easeInOut(duration: 0.25), value: cornerRadius)
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius)
                     .strokeBorder(Color.black.opacity(0.5), lineWidth: 1)
+                    .animation(.easeInOut(duration: 0.25), value: cornerRadius)
             )
     }
 }
