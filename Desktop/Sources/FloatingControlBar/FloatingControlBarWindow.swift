@@ -529,28 +529,34 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
         let restoredDraft = state.draftInputText
         state.draftInputText = ""
 
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-            state.showingAIConversation = true
-            state.showingAIResponse = false
-            state.isAILoading = false
-            state.aiInputText = restoredDraft
-            state.currentAIMessage = nil
-            // Match the explicit resize height so the observer doesn't immediately override it
-            state.inputViewHeight = 146
+        // Delay the SwiftUI state change slightly so the window has started expanding
+        // before content appears. This prevents the input view from rendering in
+        // the still-tiny pill frame and creates a smooth reveal effect.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self] in
+            guard let self = self else { return }
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                self.state.showingAIConversation = true
+                self.state.showingAIResponse = false
+                self.state.isAILoading = false
+                self.state.aiInputText = restoredDraft
+                self.state.currentAIMessage = nil
+                // Match the explicit resize height so the observer doesn't immediately override it
+                self.state.inputViewHeight = 146
+            }
         }
         setupInputHeightObserver()
         installGlobalClickOutsideMonitor()
 
         // Make the window key so the FazmTextEditor's focusOnAppear can take effect.
         // The text editor itself handles focusing via updateNSView once it's in the window.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             self?.makeKeyAndOrderFront(nil)
         }
 
         // Fallback: explicitly focus the input after SwiftUI layout settles.
         // The AutoFocusScrollView.viewDidMoveToWindow() fires once and can miss
         // if the window isn't yet key at that moment.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
             self?.focusInputField()
         }
 
