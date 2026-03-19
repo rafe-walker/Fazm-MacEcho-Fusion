@@ -13,6 +13,7 @@ class BrowserProfileMigrationManager {
 
     private let userDefaultsKey = "hasCompletedBrowserProfileExtraction"
     private var window: NSWindow?
+    private var windowCloseDelegate: WindowCloseDelegate?
 
     private init() {}
 
@@ -53,9 +54,11 @@ class BrowserProfileMigrationManager {
         popupWindow.minSize = NSSize(width: 420, height: 400)
         popupWindow.center()
         popupWindow.level = .floating
-        popupWindow.delegate = WindowCloseDelegate { [weak self] in
+        let closeDelegate = WindowCloseDelegate { [weak self] in
             self?.skip()
         }
+        self.windowCloseDelegate = closeDelegate
+        popupWindow.delegate = closeDelegate
 
         self.window = popupWindow
         popupWindow.makeKeyAndOrderFront(nil)
@@ -110,6 +113,8 @@ class BrowserProfileMigrationManager {
     private func dismissWindow() {
         window?.close()
         window = nil
+        windowCloseDelegate = nil
+        ChatToolExecutor.onQuickReplyOptions = nil
     }
 }
 
