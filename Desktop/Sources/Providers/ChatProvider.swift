@@ -11,9 +11,6 @@ extension Notification.Name {
 // MARK: - UserDefaults Extension for KVO
 
 extension UserDefaults {
-    @objc dynamic var multiChatEnabled: Bool {
-        return bool(forKey: "multiChatEnabled")
-    }
     @objc dynamic var playwrightUseExtension: Bool {
         return bool(forKey: "playwrightUseExtension")
     }
@@ -22,52 +19,6 @@ extension UserDefaults {
     }
 }
 
-// MARK: - Chat Session Model
-
-/// A chat session that groups related messages
-struct ChatSession: Identifiable, Codable, Equatable {
-    let id: String
-    var title: String
-    var preview: String?
-    let createdAt: Date
-    var updatedAt: Date
-    let appId: String?
-    var messageCount: Int
-    var starred: Bool
-
-    enum CodingKeys: String, CodingKey {
-        case id, title, preview, starred
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
-        case appId = "app_id"
-        case messageCount = "message_count"
-    }
-
-    init(id: String = UUID().uuidString, title: String = "New Chat", preview: String? = nil,
-         createdAt: Date = Date(), updatedAt: Date = Date(), appId: String? = nil,
-         messageCount: Int = 0, starred: Bool = false) {
-        self.id = id
-        self.title = title
-        self.preview = preview
-        self.createdAt = createdAt
-        self.updatedAt = updatedAt
-        self.appId = appId
-        self.messageCount = messageCount
-        self.starred = starred
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(String.self, forKey: .id)
-        title = try container.decodeIfPresent(String.self, forKey: .title) ?? "New Chat"
-        preview = try container.decodeIfPresent(String.self, forKey: .preview)
-        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
-        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
-        appId = try container.decodeIfPresent(String.self, forKey: .appId)
-        messageCount = try container.decodeIfPresent(Int.self, forKey: .messageCount) ?? 0
-        starred = try container.decodeIfPresent(Bool.self, forKey: .starred) ?? false
-    }
-}
 
 // MARK: - Content Block Model
 
@@ -328,10 +279,7 @@ class ChatProvider: ObservableObject {
     @Published var chatMode: ChatMode = .act
     @Published var draftText = ""
     @Published var messages: [ChatMessage] = []
-    @Published var sessions: [ChatSession] = []
-    @Published var currentSession: ChatSession?
     @Published var isLoading = false
-    @Published var isLoadingSessions = true  // Start true since we load sessions on init
     @Published var isSending = false
     @Published var isStopping = false
     @Published var isClearing = false
@@ -363,11 +311,6 @@ class ChatProvider: ObservableObject {
     @Published var selectedAppId: String?
     @Published var hasMoreMessages = false
     @Published var isLoadingMoreMessages = false
-    @Published var showStarredOnly = false
-    @Published var searchQuery = ""
-    /// Pre-computed grouped sessions for sidebar display.
-    /// Updated reactively via Combine instead of recomputed on every SwiftUI render pass.
-    @Published private(set) var groupedSessions: [(String, [ChatSession])] = []
 
     /// Triggered when a browser tool is called but the extension token isn't configured.
     /// The UI should observe this and present BrowserExtensionSetup.
@@ -586,27 +529,6 @@ class ChatProvider: ObservableObject {
     /// instead of appending to the existing one. Set by text_block_boundary events.
     private var forceNewTextBlock: Bool = false
 
-    // MARK: - Filtered Sessions
-    var filteredSessions: [ChatSession] {
-        // Filter out "empty" sessions (only AI greeting, no user messages)
-        // These have messageCount <= 1 and default "New Chat" title
-        // Always keep the currently selected session visible
-        let nonEmptySessions = sessions.filter { session in
-            // Always show the current session (so user can continue working)
-            if session.id == currentSession?.id { return true }
-            // Keep sessions that have user messages (more than just AI greeting)
-            // or have been renamed (user intentionally kept them)
-            return session.messageCount > 1 || session.title != "New Chat"
-        }
-
-        guard !searchQuery.isEmpty else { return nonEmptySessions }
-        let query = searchQuery.lowercased()
-        return nonEmptySessions.filter { session in
-            session.title.lowercased().contains(query) ||
-            (session.preview?.lowercased().contains(query) ?? false)
-        }
-    }
-
     // MARK: - Cached Context for Prompts
     private var cachedMemories: [ServerMemory] = []
     private var memoriesLoaded = false
@@ -644,11 +566,6 @@ class ChatProvider: ObservableObject {
     // MARK: - Dev Mode
     @AppStorage("devModeEnabled") var devModeEnabled = false
     private var devModeContext: String?
-
-    // MARK: - Current Session ID
-    var currentSessionId: String? {
-        currentSession?.id
-    }
 
     // MARK: - Current Model
     var currentModel: String {
