@@ -114,6 +114,7 @@
     "Reduced observer response delay from 30s to 5s",
     "Bundled Hindsight memory system \u2014 the AI now remembers context across conversations",
     "Fixed floating bar not being draggable despite setting being enabled",
-    "Fixed crash caused by browser profile migration popup not properly cleaning up memory on dismiss"
+    "Fixed crash caused by browser profile migration popup not properly cleaning up memory on dismiss",
+    "Smoother floating bar animations when expanding, collapsing, and switching between states"
   ]
 }
