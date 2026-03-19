@@ -56,7 +56,7 @@ enum ChatContentBlock: Identifiable {
         case .toolCall(let id, _, _, _, _, _): return id
         case .thinking(let id, _): return id
         case .discoveryCard(let id, _, _, _): return id
-        case .observerCard(let id, _, _, _, _): return id
+        case .observerCard(let id, _, _, _, _, _): return id
         }
     }
 
