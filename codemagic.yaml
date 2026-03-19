@@ -533,14 +533,14 @@ workflows:
             fi
           fi
 
-          # Sign Hindsight Memory MCP native binaries (.so/.dylib in venv)
+          # Sign Hindsight Memory MCP native binaries (.so/.dylib and executables in venv)
           HINDSIGHT_BUNDLE="$APP_BUNDLE/Contents/Resources/hindsight"
           if [ -d "$HINDSIGHT_BUNDLE/.venv" ]; then
-            find "$HINDSIGHT_BUNDLE/.venv" -type f \
-              \( -name "*.so" -o -name "*.dylib" \) 2>/dev/null | while read native_bin; do
-              file "$native_bin" 2>/dev/null | grep -q "Mach-O" && \
+            # Sign all Mach-O files (libraries, dylibs, and standalone executables)
+            find "$HINDSIGHT_BUNDLE/.venv" -type f 2>/dev/null | while read bin; do
+              file "$bin" 2>/dev/null | grep -q "Mach-O" && \
                 codesign --force --options runtime --timestamp \
-                  --sign "$SIGN_IDENTITY" "$native_bin"
+                  --sign "$SIGN_IDENTITY" "$bin" 2>/dev/null || true
             done
             if [ -f "$HINDSIGHT_BUNDLE/.venv/bin/python3" ]; then
               REAL_PYTHON=$(readlink -f "$HINDSIGHT_BUNDLE/.venv/bin/python3" 2>/dev/null || echo "$HINDSIGHT_BUNDLE/.venv/bin/python3")
