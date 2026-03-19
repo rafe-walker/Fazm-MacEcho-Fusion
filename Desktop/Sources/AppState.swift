@@ -963,10 +963,10 @@ class AppState: ObservableObject {
 
             // 7. Clear Google Workspace MCP auth
             let homeDir2 = FileManager.default.homeDirectoryForCurrentUser.path
-            let gwsMcpAuthDir = "\(homeDir2)/google_workspace_mcp/auth"
-            let gwsMcpClientSecret = "\(homeDir2)/google_workspace_mcp/client_secret.json"
-            let oldGwsConfigDir = "\(homeDir2)/.config/gws"
-            for path in [gwsMcpAuthDir, gwsMcpClientSecret, oldGwsConfigDir] {
+            let workspaceMcpAuthDir = "\(homeDir2)/google_workspace_mcp/auth"
+            let workspaceMcpClientSecret = "\(homeDir2)/google_workspace_mcp/client_secret.json"
+            let oldWorkspaceConfigDir = "\(homeDir2)/.config/gws"
+            for path in [workspaceMcpAuthDir, workspaceMcpClientSecret, oldWorkspaceConfigDir] {
                 if FileManager.default.fileExists(atPath: path) {
                     try? FileManager.default.removeItem(atPath: path)
                     log("Removed: \(path)")
