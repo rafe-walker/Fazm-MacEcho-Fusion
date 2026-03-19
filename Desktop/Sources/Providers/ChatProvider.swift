@@ -1759,7 +1759,6 @@ class ChatProvider: ObservableObject {
         messages.append(userMessage)
 
         // Persist to backend
-        let capturedSessionId = isInDefaultChat ? nil : currentSessionId
         let capturedAppId = overrideAppId ?? selectedAppId
         let localId = userMessage.id
         Task { [weak self] in
@@ -1768,7 +1767,7 @@ class ChatProvider: ObservableObject {
                     text: trimmedText,
                     sender: "human",
                     appId: capturedAppId,
-                    sessionId: capturedSessionId
+                    sessionId: nil
                 )
                 await MainActor.run {
                     if let index = self?.messages.firstIndex(where: { $0.id == localId }) {
@@ -1849,22 +1848,6 @@ class ChatProvider: ObservableObject {
             return
         }
 
-        // Determine session ID based on mode
-        // In default chat mode (isInDefaultChat=true): no session ID (compatible with Flutter)
-        // In session mode: require session ID
-        var sessionId: String? = nil
-        if !isInDefaultChat {
-            // Session mode - require a session
-            if currentSession == nil {
-                _ = await createNewSession()
-            }
-            guard let sid = currentSessionId else {
-                errorMessage = "Failed to create chat session"
-                return
-            }
-            sessionId = sid
-        }
-
         isSending = true
         errorMessage = nil
         pendingRetryMessage = trimmedText
@@ -1879,7 +1862,6 @@ class ChatProvider: ObservableObject {
         // save has almost always already completed and its ID has been synced.
         let userMessageId = UUID().uuidString
         let isFirstMessage = messages.isEmpty
-        let capturedSessionId = sessionId
         let capturedAppId = overrideAppId ?? selectedAppId
         if !isFollowUp {
             Task { [weak self] in
@@ -1888,7 +1870,7 @@ class ChatProvider: ObservableObject {
                         text: trimmedText,
                         sender: "human",
                         appId: capturedAppId,
-                        sessionId: capturedSessionId
+                        sessionId: nil
                     )
                     // Adopt the server ID (local UUID → server ID) and mark synced.
                     // isSynced=true enables rating buttons on the message bubble.
@@ -2221,7 +2203,7 @@ class ChatProvider: ObservableObject {
                         text: textToSave,
                         sender: "ai",
                         appId: capturedAppId,
-                        sessionId: capturedSessionId,
+                        sessionId: nil,
                         metadata: toolMetadata
                     )
                     // Adopt the server ID so future polls find this message by ID
@@ -2231,15 +2213,10 @@ class ChatProvider: ObservableObject {
                         messages[syncIndex].id = response.id
                         messages[syncIndex].isSynced = true
                     }
-                    log("Saved and synced AI response: \(response.id) (session=\(capturedSessionId ?? "nil"), tool_calls=\(toolMetadata != nil ? "yes" : "none"))")
+                    log("Saved and synced AI response: \(response.id) (tool_calls=\(toolMetadata != nil ? "yes" : "none"))")
                 } catch {
                     logError("Failed to persist AI response", error: error)
                 }
-            }
-
-            // Auto-generate title after first exchange (user message + AI response)
-            if isFirstMessage, let sid = capturedSessionId {
-                await generateSessionTitle(sessionId: sid)
             }
 
             let totalMs = Int(Date().timeIntervalSince(queryStartTime) * 1000)
@@ -2280,7 +2257,7 @@ class ChatProvider: ObservableObject {
             // Track conversation depth (total messages in this session)
             AnalyticsManager.shared.chatConversationDepth(
                 messageCount: messages.count,
-                sessionId: capturedSessionId
+                sessionId: nil
             )
 
             // Track floating bar response metrics separately
@@ -2354,7 +2331,7 @@ class ChatProvider: ObservableObject {
                                 text: partialText,
                                 sender: "ai",
                                 appId: capturedAppId,
-                                sessionId: capturedSessionId,
+                                sessionId: nil,
                                 metadata: partialToolMetadata
                             )
                             await MainActor.run {
@@ -2427,43 +2404,6 @@ class ChatProvider: ObservableObject {
             // Notify UI to dequeue (posted on main actor)
             NotificationCenter.default.post(name: .chatProviderDidDequeue, object: nil, userInfo: ["text": next.text])
             await sendMessage(next.text, isFollowUp: true, sessionKey: next.sessionKey)
-        }
-    }
-
-    /// Generate a title for the session using LLM
-    private func generateSessionTitle(sessionId: String) async {
-        // Need at least 2 messages (user + AI) for meaningful title
-        guard messages.count >= 2 else {
-            log("Not enough messages for title generation")
-            return
-        }
-
-        // Convert messages to the format expected by the API
-        let messageTuples: [(text: String, sender: String)] = messages.map { msg in
-            (text: msg.text, sender: msg.sender == .user ? "human" : "ai")
-        }
-
-        do {
-            let response = try await APIClient.shared.generateSessionTitle(
-                sessionId: sessionId,
-                messages: messageTuples
-            )
-
-            // Update session in list
-            if let index = sessions.firstIndex(where: { $0.id == sessionId }) {
-                sessions[index].title = response.title
-            }
-
-            // Update current session
-            if currentSession?.id == sessionId {
-                currentSession?.title = response.title
-            }
-
-            log("Generated session title: \(response.title)")
-            AnalyticsManager.shared.sessionTitleGenerated()
-        } catch {
-            logError("Failed to generate session title", error: error)
-            // Non-fatal - session continues with default title
         }
     }
 
@@ -3005,37 +2945,4 @@ class ChatProvider: ObservableObject {
         await loadDefaultChatMessages()
     }
 
-    // MARK: - Session Grouping Helpers
-
-    /// Group sessions by date — called by the Combine observer, not on every SwiftUI render pass.
-    private func computeGroupedSessions() -> [(String, [ChatSession])] {
-        let calendar = Calendar.current
-        let now = Date()
-
-        var today: [ChatSession] = []
-        var yesterday: [ChatSession] = []
-        var thisWeek: [ChatSession] = []
-        var older: [ChatSession] = []
-
-        for session in filteredSessions {
-            if calendar.isDateInToday(session.updatedAt) {
-                today.append(session)
-            } else if calendar.isDateInYesterday(session.updatedAt) {
-                yesterday.append(session)
-            } else if let weekAgo = calendar.date(byAdding: .day, value: -7, to: now),
-                      session.updatedAt > weekAgo {
-                thisWeek.append(session)
-            } else {
-                older.append(session)
-            }
-        }
-
-        var groups: [(String, [ChatSession])] = []
-        if !today.isEmpty { groups.append(("Today", today)) }
-        if !yesterday.isEmpty { groups.append(("Yesterday", yesterday)) }
-        if !thisWeek.isEmpty { groups.append(("This Week", thisWeek)) }
-        if !older.isEmpty { groups.append(("Older", older)) }
-
-        return groups
-    }
 }
