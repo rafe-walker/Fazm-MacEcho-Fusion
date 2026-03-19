@@ -668,16 +668,17 @@ async function handleJsonRpc(
           const edgesSummary = edges.map((e: Record<string, unknown>) => `${e.source || e.source_id} → ${e.target || e.target_id} (${e.relation || e.label})`).join(", ");
           body = `Save to knowledge graph:\n• Nodes: ${nodesSummary || "none"}\n• Edges: ${edgesSummary || "none"}`;
         }
-        const cardContent = JSON.stringify({
+        // Strip description from args before storing in pending_operations (avoid duplication)
+        const { description: _desc, ...argsWithoutDescription } = args as Record<string, unknown>;
+        const insertCard = buildObserverInsert("approval_request", {
           title: "Update knowledge graph",
           body,
-          pending_operations: [{ tool: "save_knowledge_graph", args }],
+          pending_operations: [{ tool: "save_knowledge_graph", args: argsWithoutDescription }],
           buttons: [
             { label: "Approve", action: "approve" },
             { label: "Dismiss", action: "dismiss" },
           ],
         });
-        const insertCard = `INSERT INTO observer_activity (id, type, content, status, createdAt) VALUES (abs(random()), 'approval_request', '${cardContent.replace(/'/g, "''")}', 'pending', datetime('now'))`;
         await requestSwiftTool("execute_sql", { query: insertCard });
         notifyObserverCardReady();
         if (!isNotification) {
