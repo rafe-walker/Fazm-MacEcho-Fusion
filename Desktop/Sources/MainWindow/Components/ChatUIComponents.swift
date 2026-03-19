@@ -351,9 +351,7 @@ struct ObserverCardView: View {
             }
 
             // Content
-            Text(content)
-                .scaledFont(size: 13)
-                .foregroundColor(.primary)
+            SelectableMarkdown(text: content, sender: .ai)
                 .fixedSize(horizontal: false, vertical: true)
 
             // Buttons
