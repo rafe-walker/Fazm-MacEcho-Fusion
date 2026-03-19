@@ -120,7 +120,7 @@ class SessionRecordingManager {
     }
 
     private func getHardwareUUID() -> String? {
-        let service = IOServiceGetMatchingService(kIOMasterPortDefault, IOServiceMatching("IOPlatformExpertDevice"))
+        let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOPlatformExpertDevice"))
         guard service != 0 else { return nil }
         defer { IOObjectRelease(service) }
         let key = kIOPlatformUUIDKey as CFString
