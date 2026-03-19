@@ -113,6 +113,7 @@
     "Observer cards now appear immediately in chat with accept/reject buttons and click feedback",
     "Reduced observer response delay from 30s to 5s",
     "Bundled Hindsight memory system \u2014 the AI now remembers context across conversations",
-    "Fixed floating bar not being draggable despite setting being enabled"
+    "Fixed floating bar not being draggable despite setting being enabled",
+    "Fixed crash caused by browser profile migration popup not properly cleaning up memory on dismiss"
   ]
 }
