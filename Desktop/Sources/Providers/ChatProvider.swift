@@ -470,13 +470,25 @@ class ChatProvider: ObservableObject {
         }
     }
 
-    /// Switch bridge mode, tearing down old bridge and setting up new one
+    /// Switch bridge mode, tearing down old bridge and setting up new one.
+    /// If a query is in-flight (`isSending`), the switch is deferred until the query completes.
     func switchBridgeMode(to newMode: String) async {
         let oldMode = bridgeMode
         guard newMode != oldMode else {
             log("ChatProvider: switchBridgeMode(\(newMode)) — already in this mode, skipping restart")
+            pendingBridgeModeSwitch = nil
             return
         }
+
+        // Defer the switch if a query is in-flight — killing the bridge mid-query
+        // causes the query to hang until the process-exit handler fires.
+        if isSending {
+            log("ChatProvider: deferring switchBridgeMode(\(newMode)) — query in progress")
+            pendingBridgeModeSwitch = newMode
+            return
+        }
+
+        pendingBridgeModeSwitch = nil
         log("ChatProvider: switching bridge mode to \(newMode) (current stored: \(oldMode))")
 
         // Track the mode switch in analytics
@@ -935,7 +947,10 @@ class ChatProvider: ObservableObject {
 
     /// Check whether the user has Claude OAuth credentials stored in the macOS Keychain.
     /// Our OAuth flow stores tokens under the "Claude Code-credentials" service name.
-    func checkClaudeConnectionStatus() {
+    ///
+    /// - Parameter autoSwitchToPersonal: When true (used at init), automatically switches
+    ///   to personal mode if credentials are found and we're not already in personal mode.
+    func checkClaudeConnectionStatus(autoSwitchToPersonal: Bool = false) {
         Task.detached { [weak self] in
             let proc = Process()
             proc.executableURL = URL(fileURLWithPath: "/usr/bin/security")
@@ -947,7 +962,14 @@ class ChatProvider: ObservableObject {
                 proc.waitUntilExit()
                 let hasCredentials = proc.terminationStatus == 0
                 log("ChatProvider: Keychain Claude credentials → \(hasCredentials ? "found" : "not found")")
-                await MainActor.run { self?.isClaudeConnected = hasCredentials }
+                await MainActor.run {
+                    guard let self else { return }
+                    self.isClaudeConnected = hasCredentials
+                    if autoSwitchToPersonal && hasCredentials && self.bridgeMode != "personal" {
+                        log("ChatProvider: Active Claude CLI session detected, auto-switching to personal mode")
+                        Task { await self.switchBridgeMode(to: "personal") }
+                    }
+                }
             } catch {
                 logError("ChatProvider: Failed to check Keychain for Claude credentials", error: error)
                 await MainActor.run { self?.isClaudeConnected = false }
@@ -2564,6 +2586,7 @@ class ChatProvider: ObservableObject {
             // backend copy into the local message rather than appending a duplicate.
             isSending = false
             isStopping = false
+            await applyPendingBridgeModeSwitch()
             if stoppedForBrowserSetup {
                 // Keep pendingRetryMessage so retryPendingQuery() can re-send it
                 stoppedForBrowserSetup = false
@@ -2784,6 +2807,7 @@ class ChatProvider: ObservableObject {
 
         isSending = false
         isStopping = false
+        await applyPendingBridgeModeSwitch()
 
         // If messages are queued, chain the next one as a follow-up query
         if !pendingMessages.isEmpty {
