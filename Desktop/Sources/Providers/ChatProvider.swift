@@ -335,6 +335,10 @@ class ChatProvider: ObservableObject {
     @Published var isSending = false
     @Published var isStopping = false
     @Published var isClearing = false
+
+    /// When a mode switch is requested while a query is in-flight (`isSending`),
+    /// the target mode is stored here and applied after the query completes.
+    private var pendingBridgeModeSwitch: String?
     @Published var errorMessage: String?
     @Published var showCreditExhaustedAlert = false
     /// True while the agent is compacting conversation context
@@ -637,14 +641,10 @@ class ChatProvider: ObservableObject {
     init() {
         log("ChatProvider initialized, will start Claude bridge on first use")
 
-        // Check if user has an active Claude Code CLI session and auto-switch to personal mode
-        checkClaudeConnectionStatus()
-        if isClaudeConnected && bridgeMode != "personal" {
-            log("ChatProvider: Active Claude CLI session detected, auto-switching to personal mode")
-            Task { @MainActor in
-                await self.switchBridgeMode(to: "personal")
-            }
-        }
+        // Check if user has an active Claude Code CLI session and auto-switch to personal mode.
+        // The keychain check is async (runs in Task.detached), so we must trigger the mode
+        // switch from within the completion — not from a synchronous read of isClaudeConnected.
+        checkClaudeConnectionStatus(autoSwitchToPersonal: true)
 
         // Observe changes to multiChatEnabled setting
         multiChatObserver = UserDefaults.standard.publisher(for: \.multiChatEnabled)
