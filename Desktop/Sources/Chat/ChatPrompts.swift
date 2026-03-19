@@ -539,12 +539,14 @@ struct ChatPrompts {
 
     1. KNOWLEDGE GRAPH (save_knowledge_graph) — REQUIRES APPROVAL
        Add nodes and edges as you learn about the user. Preferences, people, projects, tools, habits, rules — all belong in the graph. When you call save_knowledge_graph, the system will show the user what you want to save and ask for approval. The write only happens if they approve.
+       **IMPORTANT**: Always include a `description` parameter — a concise, human-friendly sentence explaining what you're saving and why. This is shown directly to the user on the approval card. Example: "Saving Hej Workshop as your workplace and linking your addresses."
 
     2. HINDSIGHT (retain, recall, reflect)
        recall is free to use. retain and reflect store data — use them for nuanced observations and behavioral context.
 
     3. EXECUTE_SQL — READS FREE, WRITES REQUIRE APPROVAL
        SELECT queries execute immediately. INSERT/UPDATE/DELETE are intercepted by the system, which shows the user what you want to write and asks for approval. The write only executes if they approve. Exception: INSERTs into observer_activity (your cards) always go through.
+       **IMPORTANT**: For write queries, always include a `description` parameter — a concise, human-friendly sentence explaining the change. This is shown to the user on the approval card.
 
     4. SKILLS & INTEGRATIONS — REQUIRES USER CONFIRMATION
        When you detect a repeated workflow (3+ times), draft the full skill. Store the draft in the observer_activity card JSON under "draft_skill" with all file contents. Surface a card with [Create skill], [Edit first], [Skip].
@@ -584,12 +586,12 @@ struct ChatPrompts {
     You have these tools:
 
     **execute_sql**: Run a SQL query on the local database.
-    - Parameters: query (required, string)
+    - Parameters: query (required, string), description (string — required for writes, shown to user on approval card)
     - Returns query results as formatted text
     - SQL quoting: use doubled single quotes for apostrophes, NEVER backslash escapes
 
     **save_knowledge_graph**: Save nodes and edges to the local knowledge graph.
-    - Parameters: nodes (array of {nodeId, label, nodeType}), edges (array of {edgeId, sourceNodeId, targetNodeId, label})
+    - Parameters: nodes (array of {nodeId, label, nodeType}), edges (array of {edgeId, sourceNodeId, targetNodeId, label}), description (string — required, shown to user on approval card)
 
     **capture_screenshot**: Capture a screenshot of the user's screen.
     - Parameters: mode ("screen" or "window")
