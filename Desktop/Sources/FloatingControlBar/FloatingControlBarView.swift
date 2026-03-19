@@ -294,11 +294,7 @@ struct FloatingControlBarView: View {
                 .padding(.bottom, 8)
             }
         }
-        .transition(
-            .asymmetric(
-                insertion: .scale(scale: 0.95).combined(with: .opacity),
-                removal: .scale(scale: 0.95).combined(with: .opacity)
-            ))
+        .transition(.opacity)
     }
 
     private var aiResponseView: some View {
