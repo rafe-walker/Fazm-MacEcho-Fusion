@@ -364,15 +364,17 @@ final class UpdaterViewModel: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            guard let self else { return }
-            if let observer = self.appManagementRetryObserver {
-                NotificationCenter.default.removeObserver(observer)
-                self.appManagementRetryObserver = nil
-            }
-            logSync("Sparkle: Retrying update after App Management permission grant")
-            // Small delay to let the TCC change take effect
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                self.checkForUpdatesInBackground()
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if let observer = self.appManagementRetryObserver {
+                    NotificationCenter.default.removeObserver(observer)
+                    self.appManagementRetryObserver = nil
+                }
+                logSync("Sparkle: Retrying update after App Management permission grant")
+                // Small delay to let the TCC change take effect
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    self.checkForUpdatesInBackground()
+                }
             }
         }
     }
