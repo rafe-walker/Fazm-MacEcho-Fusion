@@ -482,7 +482,7 @@ class AuthService: NSObject {
 
     /// Get a valid ID token, refreshing if necessary.
     func getIdToken(forceRefresh: Bool = false) async throws -> String {
-        guard let currentToken = idToken, let _ = refreshToken else {
+        guard let _ = idToken, let _ = refreshToken else {
             throw AuthError.notSignedIn
         }
 
@@ -726,7 +726,7 @@ class AuthService: NSObject {
 
         var boundAddr = sockaddr_in()
         var boundAddrLen = socklen_t(MemoryLayout<sockaddr_in>.size)
-        withUnsafeMutablePointer(to: &boundAddr) {
+        _ = withUnsafeMutablePointer(to: &boundAddr) {
             $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { ptr in
                 getsockname(socketFD, ptr, &boundAddrLen)
             }
