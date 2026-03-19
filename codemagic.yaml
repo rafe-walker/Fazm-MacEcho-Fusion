@@ -374,11 +374,20 @@ workflows:
           HINDSIGHT_BUNDLE="$APP_BUNDLE/Contents/Resources/hindsight"
           mkdir -p "$HINDSIGHT_BUNDLE"
           echo "Creating Hindsight venv..."
-          uv venv "$HINDSIGHT_BUNDLE/.venv" --python python3.12 --quiet 2>&1 | tail -1 || true
+          uv venv "$HINDSIGHT_BUNDLE/.venv" --python python3.12 --relocatable --quiet 2>&1 | tail -1 || true
           uv pip install --python "$HINDSIGHT_BUNDLE/.venv/bin/python3" \
             'hindsight-api-slim[embedded-db]' sentence-transformers --quiet 2>&1 | tail -3 || true
           # Remove claude_agent_sdk (195MB) — only needed for claude_code LLM provider, we use gemini
           uv pip uninstall --python "$HINDSIGHT_BUNDLE/.venv/bin/python3" claude-agent-sdk --quiet 2>/dev/null || true
+          # Replace absolute Python symlink with a copy so the venv works on other machines
+          HINDSIGHT_REAL_PYTHON=$(readlink -f "$HINDSIGHT_BUNDLE/.venv/bin/python" 2>/dev/null)
+          if [ -n "$HINDSIGHT_REAL_PYTHON" ] && [ -f "$HINDSIGHT_REAL_PYTHON" ]; then
+            rm -f "$HINDSIGHT_BUNDLE/.venv/bin/python"
+            cp "$HINDSIGHT_REAL_PYTHON" "$HINDSIGHT_BUNDLE/.venv/bin/python"
+            rm -f "$HINDSIGHT_BUNDLE/.venv/bin/python3" "$HINDSIGHT_BUNDLE/.venv/bin/python3.12"
+            ln -s python "$HINDSIGHT_BUNDLE/.venv/bin/python3"
+            ln -s python "$HINDSIGHT_BUNDLE/.venv/bin/python3.12"
+          fi
           echo "Bundled Hindsight Memory MCP with venv"
 
           # Update Info.plist metadata
