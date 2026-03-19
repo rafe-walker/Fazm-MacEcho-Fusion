@@ -117,6 +117,20 @@ struct AIResponseView: View {
                         proxy.scrollTo("bottom", anchor: .bottom)
                     }
                 }
+                .onChange(of: state.pendingObserverExchanges.count) {
+                    // Observer card arrived — scroll to show it
+                    if !userHasScrolledUp {
+                        withAnimation(.easeOut(duration: 0.15)) {
+                            proxy.scrollTo("bottom", anchor: .bottom)
+                        }
+                    }
+                }
+                .onChange(of: isLoading) {
+                    // When loading finishes, flush any pending observer cards into chat history
+                    if !isLoading {
+                        state.flushPendingObserverExchanges()
+                    }
+                }
                 .onChange(of: isVoiceFollowUp) {
                     if isVoiceFollowUp {
                         userHasScrolledUp = false
