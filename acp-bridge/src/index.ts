@@ -31,7 +31,7 @@ import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { createServer as createNetServer, type Socket } from "net";
 import { tmpdir } from "os";
-import { unlinkSync, appendFileSync, existsSync, watch, mkdirSync } from "fs";
+import { unlinkSync, appendFileSync, existsSync, watch, mkdirSync, writeFileSync } from "fs";
 import type {
   InboundMessage,
   OutboundMessage,
@@ -85,67 +85,66 @@ const gwsMcpDir = join(
 const gwsMcpPython = join(gwsMcpDir, ".venv", "bin", "python3");
 const gwsMcpMain = join(gwsMcpDir, "main.py");
 
-// Hindsight Memory MCP — Python HTTP server bundled under Contents/Resources/hindsight/
-const hindsightDir = join(
+// Hindsight Memory MCP — Python HTTP server, venv downloaded on first launch
+// Dev builds: venv in Contents/Resources/hindsight/ (built by run.sh/build.sh)
+// Release builds: venv downloaded from GCS to ~/Library/Application Support/Fazm/hindsight/
+const hindsightDevDir = join(
   dirname(process.execPath),
   "..",
   "..",
   "Resources",
   "hindsight"
 );
+const hindsightAppSupportDir = join(
+  process.env.HOME || "",
+  "Library",
+  "Application Support",
+  "Fazm",
+  "hindsight"
+);
+// Use dev dir if it has a venv (local dev builds), otherwise use Application Support
+const hindsightDir = existsSync(join(hindsightDevDir, ".venv", "bin", "python3"))
+  ? hindsightDevDir
+  : hindsightAppSupportDir;
 const hindsightPython = join(hindsightDir, ".venv", "bin", "python3");
 const HINDSIGHT_PORT = 18888;
+const HINDSIGHT_TARBALL_URL = "https://storage.googleapis.com/fazm-prod-releases/hindsight/hindsight-venv.tar.gz";
 let hindsightProcess: ChildProcess | null = null;
 let hindsightReady = false;
 
 async function ensureHindsightVenv(): Promise<boolean> {
   if (existsSync(hindsightPython)) return true;
 
-  // Check if requirements.txt exists (release builds bundle this instead of full venv)
-  const requirementsPath = join(hindsightDir, "requirements.txt");
-  if (!existsSync(requirementsPath)) return false;
-
-  logErr("Hindsight: creating venv from requirements.txt (first launch)...");
+  // Download pre-built venv tarball from GCS (first launch, ~150 MB)
+  logErr("Hindsight: downloading venv tarball (first launch)...");
   try {
-    // Use uv if available, fall back to python3 -m venv + pip
-    try {
-      execSync("command -v uv", { stdio: "ignore" });
-      execSync(`uv venv "${join(hindsightDir, ".venv")}" --python python3.12 --quiet`, {
-        stdio: ["ignore", "pipe", "pipe"],
-        timeout: 30000,
-      });
-      execSync(`uv pip install --python "${hindsightPython}" -r "${requirementsPath}" --quiet`, {
-        stdio: ["ignore", "pipe", "pipe"],
-        timeout: 120000,
-      });
-      // Remove claude_agent_sdk (195MB) — only needed for claude_code LLM provider
-      try {
-        execSync(`uv pip uninstall --python "${hindsightPython}" claude-agent-sdk --quiet`, {
-          stdio: ["ignore", "pipe", "pipe"],
-          timeout: 30000,
-        });
-      } catch {}
-    } catch {
-      // Fallback: python3 -m venv + pip
-      execSync(`python3 -m venv "${join(hindsightDir, ".venv")}"`, {
-        stdio: ["ignore", "pipe", "pipe"],
-        timeout: 30000,
-      });
-      execSync(`"${hindsightPython}" -m pip install -r "${requirementsPath}" --quiet`, {
-        stdio: ["ignore", "pipe", "pipe"],
-        timeout: 120000,
-      });
-      try {
-        execSync(`"${hindsightPython}" -m pip uninstall -y claude-agent-sdk --quiet`, {
-          stdio: ["ignore", "pipe", "pipe"],
-          timeout: 30000,
-        });
-      } catch {}
+    mkdirSync(hindsightAppSupportDir, { recursive: true });
+    const tarballPath = join(hindsightAppSupportDir, "hindsight-venv.tar.gz");
+
+    // Download with fetch + writeFileSync
+    const res = await fetch(HINDSIGHT_TARBALL_URL);
+    if (!res.ok) {
+      logErr(`Hindsight: tarball download failed: ${res.status} ${res.statusText}`);
+      return false;
     }
-    logErr("Hindsight: venv created successfully");
-    return existsSync(hindsightPython);
+    const { writeFileSync } = await import("fs");
+    const buffer = Buffer.from(await res.arrayBuffer());
+    writeFileSync(tarballPath, buffer);
+    logErr(`Hindsight: tarball downloaded (${Math.round(buffer.length / 1024 / 1024)} MB)`);
+
+    // Extract tarball
+    execSync(`tar -xzf "${tarballPath}" -C "${hindsightAppSupportDir}"`, {
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 120000,
+    });
+
+    // Clean up tarball
+    try { unlinkSync(tarballPath); } catch {}
+
+    logErr("Hindsight: venv extracted successfully");
+    return existsSync(join(hindsightAppSupportDir, ".venv", "bin", "python3"));
   } catch (err) {
-    logErr(`Hindsight: venv creation failed: ${err}`);
+    logErr(`Hindsight: venv download/extract failed: ${err}`);
     return false;
   }
 }
