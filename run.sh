@@ -199,6 +199,8 @@ RESOURCE_BUNDLE="Desktop/.build/arm64-apple-macosx/debug/Fazm_Fazm.bundle"
 if [ -d "$RESOURCE_BUNDLE" ]; then
     substep "Copying resource bundle ($(du -sh "$RESOURCE_BUNDLE" 2>/dev/null | cut -f1))"
     cp -Rf "$RESOURCE_BUNDLE" "$APP_BUNDLE/Contents/Resources/"
+    # Also copy to app root — SPM's resource_bundle_accessor uses Bundle.main.bundleURL
+    cp -Rf "$RESOURCE_BUNDLE" "$APP_BUNDLE/"
 fi
 
 # Copy Highlightr resource bundle (required — missing bundle causes fatal crash when rendering code blocks)
@@ -206,6 +208,9 @@ HIGHLIGHTR_BUNDLE="Desktop/.build/arm64-apple-macosx/debug/Highlightr_Highlightr
 if [ -d "$HIGHLIGHTR_BUNDLE" ]; then
     substep "Copying Highlightr bundle"
     cp -Rf "$HIGHLIGHTR_BUNDLE" "$APP_BUNDLE/Contents/Resources/"
+    # Also copy to app root — SPM's resource_bundle_accessor uses Bundle.main.bundleURL
+    # (= Fazm.app/) not Bundle.main.resourceURL (= Fazm.app/Contents/Resources/)
+    cp -Rf "$HIGHLIGHTR_BUNDLE" "$APP_BUNDLE/"
 fi
 
 substep "Copying acp-bridge"
