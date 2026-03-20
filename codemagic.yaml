@@ -409,6 +409,24 @@ workflows:
             'hindsight-api-slim[embedded-db]' sentence-transformers --quiet 2>&1 | tail -3 || true
           # Remove claude_agent_sdk (195MB) — only needed for claude_code LLM provider
           uv pip uninstall --python "$HINDSIGHT_BUNDLE/.venv/bin/python3" claude-agent-sdk --quiet 2>/dev/null || true
+
+          # Bundle ai-browser-profile into the app (shared Python venv)
+          # Uses the same Hindsight venv Python for portability — no system Python needed.
+          BROWSER_PROFILE_BUNDLE="$APP_BUNDLE/Contents/Resources/ai-browser-profile"
+          mkdir -p "$BROWSER_PROFILE_BUNDLE"
+          echo "Cloning ai-browser-profile..."
+          git clone --depth 1 https://github.com/m13v/ai-browser-profile.git /tmp/ai-browser-profile 2>&1 | tail -1 || true
+          if [ -d /tmp/ai-browser-profile ]; then
+            # Copy the Python package and extraction scripts
+            cp -r /tmp/ai-browser-profile/ai_browser_profile "$BROWSER_PROFILE_BUNDLE/"
+            cp /tmp/ai-browser-profile/extract.py "$BROWSER_PROFILE_BUNDLE/"
+            cp /tmp/ai-browser-profile/clean.py "$BROWSER_PROFILE_BUNDLE/" 2>/dev/null || true
+            # Copy ingestors (browser data extractors)
+            cp -r /tmp/ai-browser-profile/autofill "$BROWSER_PROFILE_BUNDLE/" 2>/dev/null || true
+            echo "Bundled ai-browser-profile into app"
+          else
+            echo "WARNING: Failed to clone ai-browser-profile — skipping"
+          fi
           # Strip __pycache__ and .dist-info to save ~25MB
           find "$HINDSIGHT_BUNDLE/.venv" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
           find "$HINDSIGHT_BUNDLE/.venv" -type d -name "*.dist-info" -exec rm -rf {} + 2>/dev/null || true
