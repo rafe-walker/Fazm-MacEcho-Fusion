@@ -462,6 +462,19 @@ workflows:
           fi
           echo "Bundled Hindsight Memory MCP with venv"
 
+          # Bundle OpenSSL 3 dylibs for pg0's embedded PostgreSQL
+          # pg0 downloads a postgres binary linked against /opt/homebrew/opt/openssl@3/lib/libssl.3.dylib
+          # which doesn't exist on clean Macs without Homebrew
+          OPENSSL_LIB="/opt/homebrew/opt/openssl@3/lib"
+          OPENSSL_DEST="$APP_BUNDLE/Contents/Frameworks"
+          if [ -f "$OPENSSL_LIB/libssl.3.dylib" ] && [ -f "$OPENSSL_LIB/libcrypto.3.dylib" ]; then
+            cp "$OPENSSL_LIB/libssl.3.dylib" "$OPENSSL_DEST/"
+            cp "$OPENSSL_LIB/libcrypto.3.dylib" "$OPENSSL_DEST/"
+            echo "Bundled OpenSSL 3 dylibs for pg0 PostgreSQL"
+          else
+            echo "WARNING: OpenSSL 3 dylibs not found at $OPENSSL_LIB — pg0 may fail on clean Macs"
+          fi
+
           # Update Info.plist metadata
           /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable   $BINARY_NAME"  "$APP_BUNDLE/Contents/Info.plist"
           /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier   $BUNDLE_ID"    "$APP_BUNDLE/Contents/Info.plist"
