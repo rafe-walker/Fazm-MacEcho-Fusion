@@ -2357,11 +2357,16 @@ class ChatProvider: ObservableObject {
             } else if let bridgeError = error as? BridgeError, case .creditExhausted(let rawMessage) = bridgeError {
                 // Credits or rate limit exhausted
                 log("ChatProvider: credit/rate limit exhausted in \(bridgeMode) mode: \(rawMessage)")
-                AnalyticsManager.shared.creditExhausted(previousMode: bridgeMode)
-                if bridgeMode == "builtin" {
-                    // Built-in credits exhausted — auto-switch to personal mode
+                let isRateLimit = rawMessage.range(of: #"resets\s+\S"#, options: .regularExpression) != nil
+                if bridgeMode == "builtin" && !isRateLimit {
+                    // Actual credit exhaustion — auto-switch to personal mode
+                    AnalyticsManager.shared.creditExhausted(previousMode: bridgeMode)
                     await switchBridgeMode(to: "personal")
                     showCreditExhaustedAlert = true
+                    errorMessage = bridgeError.errorDescription
+                } else if bridgeMode == "builtin" && isRateLimit {
+                    // Temporary rate limit on builtin account — do NOT switch modes,
+                    // user still has free trial budget remaining
                     errorMessage = bridgeError.errorDescription
                 } else {
                     // Personal mode — user hit their own Claude rate limit.
