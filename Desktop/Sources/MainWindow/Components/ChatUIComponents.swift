@@ -334,142 +334,118 @@ struct ObserverCardView: View {
     let type: String
     let content: String
     let buttons: [ObserverCardButton]
-    /// Pre-populated when the card was already acted on (persisted in DB)
     let actedAction: String?
     var onAction: ((Int64, String) -> Void)?
 
     @State private var selectedAction: String? = nil
-    /// Whether the card was auto-approved (deny button stays active for rollback)
     @State private var autoApproved: Bool = false
+    @State private var expanded: Bool = false
 
-    /// Whether this card has an approve button and should auto-approve
     private var hasApproveButton: Bool {
         buttons.contains { $0.action == "approve" }
     }
 
-    /// Whether a button should be disabled
-    private func isButtonDisabled(_ action: String) -> Bool {
-        guard let selected = selectedAction else { return false }
-        if autoApproved && action == "dismiss" { return false }
-        return selected == action || (selected != action)
+    /// One-line summary: strip markdown, truncate
+    private var oneLiner: String {
+        let stripped = content
+            .replacingOccurrences(of: "**", with: "")
+            .replacingOccurrences(of: "Saved: ", with: "")
+            .replacingOccurrences(of: "Updated: ", with: "")
+            .replacingOccurrences(of: "Confirmed: ", with: "")
+        let firstLine = stripped.components(separatedBy: "\n").first ?? stripped
+        return firstLine.count > 80 ? String(firstLine.prefix(77)) + "..." : firstLine
+    }
+
+    private var isDenied: Bool {
+        selectedAction == "dismiss" && !autoApproved
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Content
-            SelectableMarkdown(text: content, sender: .ai)
-                .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: 0) {
+            // Compact one-liner row
+            HStack(spacing: 6) {
+                Image(systemName: isDenied ? "xmark.circle.fill" : "checkmark.circle.fill")
+                    .scaledFont(size: 10)
+                    .foregroundColor(isDenied ? Color.red.opacity(0.6) : Color.green.opacity(0.6))
 
-            // Buttons
-            if !buttons.isEmpty {
-                HStack(spacing: 8) {
-                    ForEach(buttons) { button in
-                        Button {
-                            if autoApproved && button.action == "dismiss" {
-                                // Rolling back an auto-approved card
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    selectedAction = "dismiss"
-                                    autoApproved = false
-                                }
-                                onAction?(activityId, "dismiss")
-                                return
-                            }
-                            guard selectedAction == nil else { return }
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                selectedAction = button.action
-                            }
-                            onAction?(activityId, button.action)
-                        } label: {
-                            HStack(spacing: 4) {
-                                if selectedAction == button.action {
-                                    Image(systemName: button.action == "dismiss" ? "xmark" : "checkmark")
-                                        .scaledFont(size: 10, weight: .bold)
-                                }
-                                Text(selectedAction == button.action ? buttonConfirmLabel(for: button.action) : button.label)
-                                    .scaledFont(size: 12, weight: .medium)
-                            }
-                            .foregroundColor(buttonForeground(for: button.action))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 5)
+                Text(oneLiner)
+                    .scaledFont(size: 11, weight: .regular)
+                    .foregroundColor(.white.opacity(isDenied ? 0.4 : 0.7))
+                    .lineLimit(1)
+                    .strikethrough(isDenied)
+
+                Spacer()
+
+                // Deny/undo button inline
+                if autoApproved && !isDenied {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            selectedAction = "dismiss"
+                            autoApproved = false
                         }
-                        .buttonStyle(.plain)
-                        .background(buttonBackgroundResolved(for: button.action))
-                        .cornerRadius(6)
-                        .opacity(buttonOpacity(for: button.action))
-                        .disabled(isButtonDisabled(button.action))
+                        onAction?(activityId, "dismiss")
+                    } label: {
+                        Image(systemName: "xmark")
+                            .scaledFont(size: 9, weight: .medium)
+                            .foregroundColor(.white.opacity(0.3))
                     }
+                    .buttonStyle(.plain)
+                }
+
+                Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                    .scaledFont(size: 9)
+                    .foregroundColor(.white.opacity(0.3))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    expanded.toggle()
                 }
             }
+
+            // Expanded detail
+            if expanded {
+                VStack(alignment: .leading, spacing: 6) {
+                    SelectableMarkdown(text: content, sender: .ai)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if !buttons.isEmpty && selectedAction == nil {
+                        HStack(spacing: 8) {
+                            ForEach(buttons) { button in
+                                Button {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        selectedAction = button.action
+                                    }
+                                    onAction?(activityId, button.action)
+                                } label: {
+                                    Text(button.label)
+                                        .scaledFont(size: 11, weight: .medium)
+                                        .foregroundColor(.white.opacity(0.7))
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 4)
+                                }
+                                .buttonStyle(.plain)
+                                .background(Color.white.opacity(0.08))
+                                .cornerRadius(5)
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.bottom, 8)
+            }
         }
-        .padding(10)
         .onAppear {
             if selectedAction == nil, let acted = actedAction {
                 selectedAction = acted
-                // If it was previously auto-approved, deny should still be possible
-                if acted == "approve" {
-                    autoApproved = true
-                }
+                if acted == "approve" { autoApproved = true }
             } else if selectedAction == nil && hasApproveButton {
-                // Immediately auto-approve — save right away, keep deny button active for rollback
                 selectedAction = "approve"
                 autoApproved = true
                 onAction?(activityId, "approve")
             }
-        }
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(FazmColors.purplePrimary.opacity(0.08))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(FazmColors.purplePrimary.opacity(0.2), lineWidth: 1)
-                )
-        )
-    }
-
-    private func buttonConfirmLabel(for action: String) -> String {
-        switch action {
-        case "approve": return "Saved"
-        case "dismiss": return "Dismissed"
-        default: return action.capitalized
-        }
-    }
-
-    private func buttonForeground(for action: String) -> Color {
-        if let selected = selectedAction, action == selected {
-            switch action {
-            case "approve": return .green
-            case "dismiss": return Color.red.opacity(0.9)
-            default: return .white
-            }
-        }
-        return .white
-    }
-
-    private func buttonOpacity(for action: String) -> Double {
-        guard let selected = selectedAction else { return 1.0 }
-        // When auto-approved, keep deny button fully visible
-        if autoApproved && action == "dismiss" { return 1.0 }
-        if action != selected { return 0.3 }
-        return 1.0
-    }
-
-    private func buttonBackgroundResolved(for action: String) -> Color {
-        if let selected = selectedAction {
-            if action == selected {
-                switch action {
-                case "approve": return Color.green.opacity(0.2)
-                case "dismiss": return Color.red.opacity(0.15)
-                default: return Color.white.opacity(0.2)
-                }
-            } else {
-                return Color.white.opacity(0.04)
-            }
-        }
-        // Default (before any click)
-        switch action {
-        case "approve": return Color.green.opacity(0.15)
-        case "dismiss": return Color.white.opacity(0.08)
-        default: return Color.white.opacity(0.1)
         }
     }
 }
