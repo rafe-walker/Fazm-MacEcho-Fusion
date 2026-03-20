@@ -302,6 +302,8 @@ class ChatProvider: ObservableObject {
     private var floatingSessionIdKey: String { "floatingACPSessionId_\(bridgeMode)" }
     /// Maximum number of messages to restore from local DB on startup
     private static let floatingRestoreLimit = 50
+    /// UserDefaults key: when true, the user started a new chat and restore should be skipped
+    private static let floatingChatClearedKey = "floatingChatWasCleared"
 
     /// Whether we've already restored floating chat messages this session
     private var floatingChatRestored = false
@@ -791,6 +793,7 @@ class ChatProvider: ObservableObject {
         await acpBridge.resetSession(key: key)
         if key == "floating" {
             UserDefaults.standard.removeObject(forKey: floatingSessionIdKey)
+            UserDefaults.standard.set(true, forKey: Self.floatingChatClearedKey)
             pendingFloatingResume = nil
             messages = []
             pendingMessages.removeAll()
@@ -1342,6 +1345,13 @@ class ChatProvider: ObservableObject {
     func restoreFloatingChatIfNeeded() async {
         guard !floatingChatRestored else { return }
         floatingChatRestored = true
+
+        // User started a new chat before the app quit — don't restore old messages
+        if UserDefaults.standard.bool(forKey: Self.floatingChatClearedKey) {
+            UserDefaults.standard.removeObject(forKey: Self.floatingChatClearedKey)
+            log("ChatProvider: Skipping floating chat restore (new chat was started)")
+            return
+        }
 
         let savedMessages = await ChatMessageStore.loadMessages(
             context: "__floating__",
@@ -1899,6 +1909,9 @@ class ChatProvider: ObservableObject {
             } else if sessionKey == "floating" {
                 let msg = userMessage
                 Task { await ChatMessageStore.saveMessage(msg, context: "__floating__") }
+                // User sent a message in the new chat — clear the "new chat" flag
+                // so this conversation restores if the app is killed mid-conversation
+                UserDefaults.standard.removeObject(forKey: Self.floatingChatClearedKey)
             }
         }
 
