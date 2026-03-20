@@ -415,9 +415,14 @@ PYVENV
           mkdir -p "$HINDSIGHT_BUNDLE"
           echo "Creating Hindsight venv..."
           uv python install 3.12 2>&1 | tail -1 || true
-          uv venv "$HINDSIGHT_BUNDLE/.venv" --python 3.12 --relocatable --python-preference only-managed --quiet 2>&1
+          uv venv "$HINDSIGHT_BUNDLE/.venv" --python 3.12 --relocatable --python-preference only-managed 2>&1
+          echo "Installing Hindsight packages (this may take a few minutes)..."
           uv pip install --python "$HINDSIGHT_BUNDLE/.venv/bin/python3" \
-            'hindsight-api-slim[embedded-db]' sentence-transformers --quiet 2>&1 | tail -3 || true
+            'hindsight-api-slim[embedded-db]' sentence-transformers 2>&1 || {
+            echo "ERROR: Hindsight pip install failed"
+            exit 1
+          }
+          echo "Hindsight packages installed successfully"
           # Remove claude_agent_sdk (195MB) — only needed for claude_code LLM provider
           uv pip uninstall --python "$HINDSIGHT_BUNDLE/.venv/bin/python3" claude-agent-sdk --quiet 2>/dev/null || true
 
