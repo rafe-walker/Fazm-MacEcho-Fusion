@@ -339,12 +339,19 @@ struct ObserverCardView: View {
     var onAction: ((Int64, String) -> Void)?
 
     @State private var selectedAction: String? = nil
-    @State private var countdown: Int = 5
-    @State private var countdownTimer: Timer? = nil
+    /// Whether the card was auto-approved (deny button stays active for rollback)
+    @State private var autoApproved: Bool = false
 
     /// Whether this card has an approve button and should auto-approve
     private var hasApproveButton: Bool {
         buttons.contains { $0.action == "approve" }
+    }
+
+    /// Whether a button should be disabled
+    private func isButtonDisabled(_ action: String) -> Bool {
+        guard let selected = selectedAction else { return false }
+        if autoApproved && action == "dismiss" { return false }
+        return selected == action || (selected != action)
     }
 
     var body: some View {
@@ -358,9 +365,16 @@ struct ObserverCardView: View {
                 HStack(spacing: 8) {
                     ForEach(buttons) { button in
                         Button {
+                            if autoApproved && button.action == "dismiss" {
+                                // Rolling back an auto-approved card
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    selectedAction = "dismiss"
+                                    autoApproved = false
+                                }
+                                onAction?(activityId, "dismiss")
+                                return
+                            }
                             guard selectedAction == nil else { return }
-                            countdownTimer?.invalidate()
-                            countdownTimer = nil
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 selectedAction = button.action
                             }
@@ -371,13 +385,8 @@ struct ObserverCardView: View {
                                     Image(systemName: button.action == "dismiss" ? "xmark" : "checkmark")
                                         .scaledFont(size: 10, weight: .bold)
                                 }
-                                if button.action == "approve" && selectedAction == nil && hasApproveButton {
-                                    Text("\(button.label) (\(countdown))")
-                                        .scaledFont(size: 12, weight: .medium)
-                                } else {
-                                    Text(selectedAction == button.action ? buttonConfirmLabel(for: button.action) : button.label)
-                                        .scaledFont(size: 12, weight: .medium)
-                                }
+                                Text(selectedAction == button.action ? buttonConfirmLabel(for: button.action) : button.label)
+                                    .scaledFont(size: 12, weight: .medium)
                             }
                             .foregroundColor(buttonForeground(for: button.action))
                             .padding(.horizontal, 12)
@@ -386,8 +395,8 @@ struct ObserverCardView: View {
                         .buttonStyle(.plain)
                         .background(buttonBackgroundResolved(for: button.action))
                         .cornerRadius(6)
-                        .opacity(selectedAction != nil && selectedAction != button.action ? 0.3 : 1.0)
-                        .disabled(selectedAction != nil)
+                        .opacity(buttonOpacity(for: button.action))
+                        .disabled(isButtonDisabled(button.action))
                     }
                 }
             }
@@ -396,13 +405,16 @@ struct ObserverCardView: View {
         .onAppear {
             if selectedAction == nil, let acted = actedAction {
                 selectedAction = acted
+                // If it was previously auto-approved, deny should still be possible
+                if acted == "approve" {
+                    autoApproved = true
+                }
             } else if selectedAction == nil && hasApproveButton {
-                startCountdown()
+                // Immediately auto-approve — save right away, keep deny button active for rollback
+                selectedAction = "approve"
+                autoApproved = true
+                onAction?(activityId, "approve")
             }
-        }
-        .onDisappear {
-            countdownTimer?.invalidate()
-            countdownTimer = nil
         }
         .background(
             RoundedRectangle(cornerRadius: 10)
@@ -433,23 +445,12 @@ struct ObserverCardView: View {
         return .white
     }
 
-    private func startCountdown() {
-        countdown = 5
-        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { timer in
-            DispatchQueue.main.async {
-                if countdown <= 1 {
-                    timer.invalidate()
-                    countdownTimer = nil
-                    guard selectedAction == nil else { return }
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        selectedAction = "approve"
-                    }
-                    onAction?(activityId, "approve")
-                } else {
-                    countdown -= 1
-                }
-            }
-        }
+    private func buttonOpacity(for action: String) -> Double {
+        guard let selected = selectedAction else { return 1.0 }
+        // When auto-approved, keep deny button fully visible
+        if autoApproved && action == "dismiss" { return 1.0 }
+        if action != selected { return 0.3 }
+        return 1.0
     }
 
     private func buttonBackgroundResolved(for action: String) -> Color {
