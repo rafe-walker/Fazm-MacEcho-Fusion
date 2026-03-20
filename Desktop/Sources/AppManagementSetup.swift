@@ -116,7 +116,11 @@ struct AppManagementSetupView: View {
             // Bottom buttons
             VStack(spacing: 8) {
                 if permissionGranted {
-                    Button(action: onDone) {
+                    Button(action: {
+                        log("AppManagementSetup: User clicked Install Update")
+                        AnalyticsManager.shared.trackEvent("app_management_install_clicked", properties: ["version": version])
+                        onDone()
+                    }) {
                         Text("Install Update")
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 8)
@@ -125,6 +129,8 @@ struct AppManagementSetupView: View {
                     .controlSize(.large)
                 } else {
                     Button(action: {
+                        log("AppManagementSetup: User clicked Open System Settings")
+                        AnalyticsManager.shared.trackEvent("app_management_open_settings_clicked", properties: ["version": version])
                         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AppManagement") {
                             NSWorkspace.shared.open(url)
                         }
@@ -140,7 +146,11 @@ struct AppManagementSetupView: View {
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
 
-                    Button(action: onDismiss) {
+                    Button(action: {
+                        log("AppManagementSetup: User clicked Not Now")
+                        AnalyticsManager.shared.trackEvent("app_management_dismissed", properties: ["version": version, "settings_opened": settingsOpened])
+                        onDismiss()
+                    }) {
                         Text("Not Now")
                             .scaledFont(size: 13)
                             .foregroundColor(.secondary)
@@ -164,6 +174,11 @@ struct AppManagementSetupView: View {
         .onAppear {
             if startGranted {
                 permissionGranted = true
+                log("AppManagementSetup: Opened in done state (permission already granted)")
+                AnalyticsManager.shared.trackEvent("app_management_guide_shown", properties: ["version": version, "state": "done"])
+            } else {
+                log("AppManagementSetup: Opened in steps state (permission needed)")
+                AnalyticsManager.shared.trackEvent("app_management_guide_shown", properties: ["version": version, "state": "steps"])
             }
         }
         .onDisappear {
