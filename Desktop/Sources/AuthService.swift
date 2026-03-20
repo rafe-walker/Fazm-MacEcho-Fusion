@@ -192,7 +192,6 @@ class AuthService: NSObject {
             URLQueryItem(name: "code_challenge", value: codeChallenge),
             URLQueryItem(name: "code_challenge_method", value: "S256"),
             URLQueryItem(name: "access_type", value: "offline"),
-            URLQueryItem(name: "prompt", value: "consent"),
         ]
 
         guard let authURL = urlComponents.url else {
