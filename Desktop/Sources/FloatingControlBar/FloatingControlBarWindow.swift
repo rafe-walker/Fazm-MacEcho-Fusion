@@ -1634,6 +1634,14 @@ class FloatingControlBarManager {
     // MARK: - AI Query
 
     private func sendAIQuery(_ message: String, barWindow: FloatingControlBarWindow, provider: ChatProvider) async {
+        // If a query is already in-flight, enqueue instead of silently dropping.
+        // The queue drains automatically after the current response finishes.
+        if provider.isSending {
+            provider.enqueueMessage(message)
+            log("FloatingControlBarManager: Query enqueued (agent busy): \(message.prefix(80))")
+            return
+        }
+
         // Restore previous floating chat messages and session on first interaction
         await provider.restoreFloatingChatIfNeeded()
 
