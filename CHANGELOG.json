@@ -120,6 +120,9 @@
     "Fixed Google Workspace MCP not working for release-build users by creating venv at runtime",
     "Observer cards now save immediately instead of waiting 5 seconds \u2014 tap Dismiss to undo",
     "Fixed free trial users being incorrectly prompted to switch to personal account on temporary rate limits",
-    "Improved memory: Fazm now better understands when to use its knowledge about you from Hindsight and browser profile"
+    "Improved memory: Fazm now better understands when to use its knowledge about you from Hindsight and browser profile",
+    "Fixed browser profile and Hindsight failing on some machines due to bundled Python not finding its standard library",
+    "Observer AI now uses dedicated tools instead of raw SQL, fixing card creation errors",
+    "Browser profile now auto-extracts when queried for users who skipped the initial import"
   ]
 }
