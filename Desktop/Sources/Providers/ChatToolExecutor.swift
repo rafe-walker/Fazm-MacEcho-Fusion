@@ -529,6 +529,9 @@ class ChatToolExecutor {
             workDir = aiBrowserProfileDir
         }
 
+        // Capture bundled dir path before entering detached task (actor isolation)
+        let bundledDirPath = bundledBrowserProfileDir?.path
+
         // Run extraction — return as soon as the interim profile is printed (don't wait for embeddings)
         let result = await Task.detached(priority: .userInitiated) { () -> String in
             let process = Process()
@@ -538,9 +541,9 @@ class ChatToolExecutor {
 
             // Set PYTHONPATH so the bundled ai_browser_profile module is importable
             var env = ProcessInfo.processInfo.environment
-            if let bundledDir = bundledBrowserProfileDir {
+            if let bp = bundledDirPath {
                 let existing = env["PYTHONPATH"] ?? ""
-                env["PYTHONPATH"] = existing.isEmpty ? bundledDir.path : "\(bundledDir.path):\(existing)"
+                env["PYTHONPATH"] = existing.isEmpty ? bp : "\(bp):\(existing)"
             }
             process.environment = env
 
@@ -711,13 +714,13 @@ class ChatToolExecutor {
         let query = args["query"] as? String ?? "full profile"
         let tags = args["tags"] as? [String] ?? []
         let queryLiteral = pythonStringLiteral(query)
+        let dbPathLiteral = pythonStringLiteral(dbPath)
 
         return await Task.detached(priority: .userInitiated) { () -> String in
             let process = Process()
             process.executableURL = URL(fileURLWithPath: python)
 
             let tagsExpr = tags.isEmpty ? "None" : "[\(tags.map { "\"\($0)\"" }.joined(separator: ", "))]"
-            let dbPathLiteral = pythonStringLiteral(dbPath)
             let script = """
                 from ai_browser_profile import MemoryDB
                 mem = MemoryDB(\(dbPathLiteral))
