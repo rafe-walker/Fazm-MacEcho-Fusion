@@ -376,7 +376,7 @@ workflows:
           echo "Creating Hindsight venv for tarball..."
           uv venv "$HINDSIGHT_BUILD/.venv" --python python3.12 --relocatable --quiet 2>&1 | tail -1 || true
           uv pip install --python "$HINDSIGHT_BUILD/.venv/bin/python3" \
-            'hindsight-api-slim[embedded-db]' --quiet 2>&1 | tail -3 || true
+            'hindsight-api-slim[embedded-db]' sentence-transformers --quiet 2>&1 | tail -3 || true
           # Remove claude_agent_sdk (195MB) — only needed for claude_code LLM provider
           uv pip uninstall --python "$HINDSIGHT_BUILD/.venv/bin/python3" claude-agent-sdk --quiet 2>/dev/null || true
           # Strip __pycache__ and .dist-info to save ~25MB
