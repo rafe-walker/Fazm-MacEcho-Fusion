@@ -740,6 +740,7 @@ class ChatToolExecutor {
         let tags = args["tags"] as? [String] ?? []
         let queryLiteral = pythonStringLiteral(query)
         let dbPathLiteral = pythonStringLiteral(dbPath)
+        let pythonHome = bundledPythonHome
 
         return await Task.detached(priority: .userInitiated) { () -> String in
             let process = Process()
@@ -773,7 +774,7 @@ class ChatToolExecutor {
             if let pp = pythonPath {
                 let existing = env["PYTHONPATH"] ?? ""
                 env["PYTHONPATH"] = existing.isEmpty ? pp : "\(pp):\(existing)"
-                if let ph = bundledPythonHome {
+                if let ph = pythonHome {
                     env["PYTHONHOME"] = ph
                 }
             } else {
@@ -864,6 +865,8 @@ class ChatToolExecutor {
                 """
         }
 
+        let pythonHome = bundledPythonHome
+
         return await Task.detached(priority: .userInitiated) { () -> String in
             let process = Process()
             process.executableURL = URL(fileURLWithPath: python)
@@ -875,7 +878,7 @@ class ChatToolExecutor {
             if let pp = pythonPath {
                 let existing = env["PYTHONPATH"] ?? ""
                 env["PYTHONPATH"] = existing.isEmpty ? pp : "\(pp):\(existing)"
-                if let ph = bundledPythonHome {
+                if let ph = pythonHome {
                     env["PYTHONHOME"] = ph
                 }
             } else {
