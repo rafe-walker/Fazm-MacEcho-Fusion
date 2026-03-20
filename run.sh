@@ -286,6 +286,11 @@ echo -n "APPL????" > "$APP_BUNDLE/Contents/PkgInfo"
 
 auth_debug "BEFORE signing: $(defaults read "$BUNDLE_ID" auth_isSignedIn 2>&1 || true)"
 
+step "Cleaning unsealed contents from bundle root..."
+# Remove any stale resource bundles that ended up in the app bundle root
+# (only Contents/ should be there — anything else breaks codesign)
+find "$APP_BUNDLE" -maxdepth 1 -not -name Contents -not -path "$APP_BUNDLE" -exec rm -rf {} +
+
 step "Removing extended attributes (xattr -cr)..."
 xattr -cr "$APP_BUNDLE"
 
