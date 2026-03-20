@@ -456,6 +456,53 @@ struct AIResponseView: View {
         }
     }
 
+    // MARK: - Consolidated Observer Cards
+
+    /// Collects all observer cards from observer-only history exchanges into one stack.
+    @ViewBuilder
+    private var consolidatedHistoryObserverCards: some View {
+        let cards = extractObserverCards(from: chatHistory.filter { $0.question.isEmpty })
+        if !cards.isEmpty {
+            ObserverCardStackView(
+                cards: cards,
+                onAction: { id, action in
+                    handleObserverCardAction(activityId: id, action: action)
+                }
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 4)
+        }
+    }
+
+    /// Collects all observer cards from pending observer exchanges into one stack.
+    @ViewBuilder
+    private var consolidatedPendingObserverCards: some View {
+        if let state = FloatingControlBarManager.shared.barState {
+            let cards = extractObserverCards(from: state.pendingObserverExchanges)
+            if !cards.isEmpty {
+                ObserverCardStackView(
+                    cards: cards,
+                    onAction: { id, action in
+                        handleObserverCardAction(activityId: id, action: action)
+                    }
+                )
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 4)
+            }
+        }
+    }
+
+    private func extractObserverCards(from exchanges: [FloatingChatExchange]) -> [ObserverCardItem] {
+        exchanges.flatMap { exchange in
+            exchange.aiMessage.contentBlocks.compactMap { block -> ObserverCardItem? in
+                if case .observerCard(let id, let activityId, let type, let content, let buttons, let actedAction) = block {
+                    return ObserverCardItem(id: id, activityId: activityId, type: type, content: content, buttons: buttons, actedAction: actedAction)
+                }
+                return nil
+            }
+        }
+    }
+
     // MARK: - Chat History
 
     private func chatExchangeView(_ exchange: FloatingChatExchange) -> some View {
