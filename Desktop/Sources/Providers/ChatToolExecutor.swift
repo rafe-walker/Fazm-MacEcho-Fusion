@@ -534,7 +534,15 @@ class ChatToolExecutor {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: python)
             process.arguments = [extractScript]
-            process.currentDirectoryURL = aiBrowserProfileDir
+            process.currentDirectoryURL = workDir
+
+            // Set PYTHONPATH so the bundled ai_browser_profile module is importable
+            var env = ProcessInfo.processInfo.environment
+            if let bundledDir = bundledBrowserProfileDir {
+                let existing = env["PYTHONPATH"] ?? ""
+                env["PYTHONPATH"] = existing.isEmpty ? bundledDir.path : "\(bundledDir.path):\(existing)"
+            }
+            process.environment = env
 
             // Use separate pipes so we can read both stdout and stderr
             let stdoutPipe = Pipe()
@@ -679,12 +687,25 @@ class ChatToolExecutor {
     private static func executeQueryBrowserProfile(_ args: [String: Any]) async -> String {
         let homeDir = FileManager.default.homeDirectoryForCurrentUser
         let aiBrowserProfileDir = homeDir.appendingPathComponent("ai-browser-profile")
-        let python = aiBrowserProfileDir.appendingPathComponent(".venv/bin/python").path
         let dbPath = aiBrowserProfileDir.appendingPathComponent("memories.db").path
 
-        guard FileManager.default.fileExists(atPath: python),
-              FileManager.default.fileExists(atPath: dbPath) else {
-            return "Browser profile not available. Run `npx ai-browser-profile init` then extract browser data to set it up."
+        // Resolve Python — prefer bundled, fall back to user-installed
+        let python: String
+        let pythonPath: String? // PYTHONPATH for bundled module
+        if let bundledPy = bundledPython, let bundledDir = bundledBrowserProfileDir {
+            python = bundledPy
+            pythonPath = bundledDir.path
+        } else {
+            let userPython = aiBrowserProfileDir.appendingPathComponent(".venv/bin/python").path
+            guard FileManager.default.fileExists(atPath: userPython) else {
+                return "Browser profile not available. Run `npx ai-browser-profile init` then extract browser data to set it up."
+            }
+            python = userPython
+            pythonPath = nil
+        }
+
+        guard FileManager.default.fileExists(atPath: dbPath) else {
+            return "Browser profile not available. Extract browser data first."
         }
 
         let query = args["query"] as? String ?? "full profile"
