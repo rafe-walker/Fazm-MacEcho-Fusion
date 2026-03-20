@@ -147,6 +147,47 @@ function buildObserverInsert(type: string, contentObj: Record<string, unknown>):
   return `INSERT INTO observer_activity (id, type, content, status, createdAt) VALUES (abs(random()), '${type}', X'${hex}', 'pending', datetime('now'))`;
 }
 
+/** Extract the card type from an observer_activity INSERT (e.g. 'insight', 'summary', 'skill_draft') */
+function extractObserverCardType(query: string): string | null {
+  // Match: VALUES (abs(random()), 'TYPE', ...
+  const match = query.match(/VALUES\s*\([^,]+,\s*'([^']+)'/i);
+  return match?.[1] || null;
+}
+
+/** Extract the JSON content object from an observer_activity INSERT.
+ *  The observer writes raw JSON in the SQL — we parse it out and return as an object.
+ *  Falls back to wrapping the raw content string in a {body:...} object. */
+function extractObserverCardContent(query: string): Record<string, unknown> {
+  // The content is the 3rd VALUES field — find it by matching after type
+  // Pattern: VALUES(id, 'type', 'JSON_CONTENT', 'status', ...)
+  // The JSON is single-quoted with doubled single quotes for escaping
+  const afterType = query.match(/VALUES\s*\([^,]+,\s*'[^']+',\s*'/i);
+  if (afterType) {
+    const startIdx = (afterType.index ?? 0) + afterType[0].length;
+    // Walk forward to find the closing quote (not doubled)
+    let depth = 0;
+    let i = startIdx;
+    let content = "";
+    while (i < query.length) {
+      if (query[i] === "'" && query[i + 1] === "'") {
+        content += "'";
+        i += 2;
+      } else if (query[i] === "'") {
+        break;
+      } else {
+        content += query[i];
+        i++;
+      }
+    }
+    try {
+      return JSON.parse(content) as Record<string, unknown>;
+    } catch {
+      return { body: content };
+    }
+  }
+  return { body: "Observer update" };
+}
+
 /** Human-readable summary of a write SQL query for approval cards */
 function describeSqlWrite(query: string): string {
   const trimmed = query.trim();
@@ -514,15 +555,29 @@ async function handleJsonRpc(
             return;
         }
 
-        // Observer mode: writes require user approval — store as pending card
+        // Observer mode: intercept all writes
         if (isObserver && isWriteQuery) {
-          // Don't intercept observer_activity INSERTs (that's how the observer creates cards)
           const isObserverActivityWrite = normalized.includes("OBSERVER_ACTIVITY");
-          if (!isObserverActivityWrite) {
-            // Use the observer's description if provided, fall back to programmatic summary
+          if (isObserverActivityWrite) {
+            // Observer card INSERT — re-encode safely via hex to prevent SQL injection
+            // from content containing SQL fragments like datetime('now')
+            const cardType = extractObserverCardType(query) || "insight";
+            const cardContent = extractObserverCardContent(query);
+            const safeInsert = buildObserverInsert(cardType, cardContent);
+            await requestSwiftTool("execute_sql", { query: safeInsert });
+            notifyObserverCardReady();
+            if (!isNotification) {
+              send({
+                jsonrpc: "2.0",
+                id,
+                result: { content: [{ type: "text", text: "Card created." }] },
+              });
+            }
+            return;
+          } else {
+            // Non-observer_activity writes require user approval
             const observerDescription = args.description as string | undefined;
             const body = observerDescription || describeSqlWrite(query);
-            // Store the pending write operation in an approval card (hex-encoded to avoid SQL quoting issues)
             const insertCard = buildObserverInsert("approval_request", {
               title: "Database update",
               body,
