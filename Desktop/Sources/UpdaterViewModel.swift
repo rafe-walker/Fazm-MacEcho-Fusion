@@ -67,6 +67,11 @@ final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {
             AnalyticsManager.shared.updateAvailable(version: version)
             self.viewModel?.updateAvailable = true
             self.viewModel?.availableVersion = version
+
+            // Show App Management permission guide on first update (before Sparkle tries to install)
+            if !UserDefaults.standard.bool(forKey: "hasSuccessfullyInstalledSparkleUpdate") {
+                self.viewModel?.showAppManagementGuideIfNeeded(version: version)
+            }
         }
     }
 
@@ -227,6 +232,8 @@ final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {
     func updater(_ updater: SPUUpdater, willInstallUpdate item: SUAppcastItem) {
         let version = item.displayVersionString
         logSync("Sparkle: Installing update v\(version)")
+        // Mark that App Management permission is working — don't show the guide again
+        UserDefaults.standard.set(true, forKey: "hasSuccessfullyInstalledSparkleUpdate")
         Task { @MainActor in
             AnalyticsManager.shared.updateInstalled(version: version)
             self.viewModel?.updateAvailable = false
