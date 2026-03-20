@@ -369,22 +369,37 @@ final class UpdaterViewModel: ObservableObject {
 
         // On launch, probe App Management permission if we previously showed the guide.
         // This handles the "Quit & Reopen" flow: user grants permission → app restarts →
-        // we detect permission is now granted and let Sparkle proceed normally.
+        // we detect permission is now granted → show "done" guide → auto-trigger update.
         if !UserDefaults.standard.bool(forKey: "hasSuccessfullyInstalledSparkleUpdate"),
-           UserDefaults.standard.string(forKey: "appManagementGuideLastShownVersion") != nil {
-            probeAndUnlockAppManagement()
+           let guideVersion = UserDefaults.standard.string(forKey: "appManagementGuideLastShownVersion") {
+            probeAndUnlockAppManagement(guideVersion: guideVersion)
         }
     }
 
     /// Try writing a temp file inside the app bundle to detect if App Management permission is granted.
-    /// If granted, set the success flag so shouldProceedWithUpdate lets Sparkle through.
-    private func probeAndUnlockAppManagement() {
+    /// If granted, set the success flag and show the "done" guide so the user sees the result.
+    private func probeAndUnlockAppManagement(guideVersion: String) {
         let testPath = Bundle.main.bundlePath + "/Contents/.fazm-permission-test"
         let fm = FileManager.default
         if fm.createFile(atPath: testPath, contents: Data("test".utf8)) {
             try? fm.removeItem(atPath: testPath)
-            logSync("UpdaterViewModel: App Management permission detected on launch — unlocking updates")
+            logSync("UpdaterViewModel: App Management permission detected on launch — showing done guide")
             UserDefaults.standard.set(true, forKey: "hasSuccessfullyInstalledSparkleUpdate")
+
+            // Show the guide in "done" state after a short delay (let the main window appear first)
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                AppManagementSetupWindowController.shared.showDone(
+                    version: guideVersion,
+                    onDone: { [weak self] in
+                        logSync("Sparkle: User clicked Install Update after permission grant")
+                        self?.checkForUpdates()
+                    },
+                    onDismiss: {
+                        logSync("Sparkle: User dismissed done guide")
+                    }
+                )
+            }
         }
     }
 
