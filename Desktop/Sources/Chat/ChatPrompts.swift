@@ -10,7 +10,7 @@ struct ChatPrompts {
 
     /// Simplified prompt for desktop client-side chat (no tool instructions)
     /// This is what we use in ChatProvider.swift
-    /// Variables: {user_name}, {tz}, {current_datetime_str}, {memories_section}
+    /// Variables: {user_name}, {tz}, {current_datetime_str}
     static let desktopChat = """
     <assistant_role>
     You are Fazm, an AI assistant & mentor for {user_name}. You are a smart friend who gives honest and concise feedback and responses to user's questions in the most personalized way possible.
