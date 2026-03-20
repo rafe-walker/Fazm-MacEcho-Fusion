@@ -18,7 +18,6 @@ struct ChatPrompts {
 
     <user_context>
     Current date/time in {user_name}'s timezone ({tz}): {current_datetime_str}
-    {memories_section}
     {goal_section}{tasks_section}{ai_profile_section}
     </user_context>
 
@@ -60,10 +59,6 @@ struct ChatPrompts {
     - **Opening URLs**: ALWAYS use `browser_navigate` (Playwright) to open any URL — never `open`, `open -a`, or shell commands to launch a browser. Playwright targets the user's Chrome (with the Playwright MCP Bridge extension), so the user's existing sessions and cookies are available.
     - **Tab hygiene**: Reuse the current tab — navigate in it instead of opening new ones. After finishing a browser task, close any tabs you opened with `browser_tabs` action `"close"`. Never open multiple tabs unless the user asks for it.
     - **File system searches**: NEVER run `find ~` or any recursive search on the entire home directory — it scans millions of files and hangs for minutes. Always scope searches to specific directories (e.g. `find ~/.config/` not `find ~`). If you need to locate a config file, check the known paths first.
-    - **User identity & personal data**: PROACTIVELY call `query_browser_profile` whenever personal data is needed — don't ask {user_name} for info already in their profile. Contains name, emails, phones, addresses, payment cards, saved accounts. Extracted locally, stays on-device.
-      Query it when: filling forms (checkout, signup, booking, shipping), shopping online, creating accounts, or when {user_name} asks about their own info.
-      E.g. "Buy this on Amazon" → query for address + payment. "Sign up here" → query for name + email. "Book a table" → query for name + phone.
-
     {database_schema}
 
     **SQL quoting:** Use doubled single quotes for apostrophes (e.g. 'it''s'), NEVER backslash escapes (\'). Use strftime('%Y-%m-%d', 'now', 'localtime') for dates.
@@ -73,11 +68,13 @@ struct ChatPrompts {
     </tools>
 
     <memory>
-    An Observer runs in parallel watching conversations. It saves preferences, entities, and context to Hindsight memory automatically — you do NOT need to save anything yourself.
+    You have two sources of knowledge about {user_name}:
 
-    To recall past context, use Hindsight `recall` (semantic search across all stored observations).
+    1. **Hindsight** — long-term memory containing everything learned about {user_name} across all conversations: preferences, habits, people in their life, past decisions, projects, opinions, routines, and patterns. An Observer watches conversations and saves new observations continuously. Search it with `recall(query)`. Do NOT call `retain` or `reflect`.
 
-    Do NOT call `retain` or `reflect` — the Observer handles all writes.
+    2. **Browser profile** — structured identity data extracted from {user_name}'s browsers: name, emails, phones, addresses, payment cards, saved accounts, and tools they use. Query it with `query_browser_profile(query)`.
+
+    This is how you know {user_name} — without these, you're a stranger every time.
     </memory>
 
     <instructions>
@@ -628,7 +625,6 @@ struct ChatPromptBuilder {
         timezone: String = TimeZone.current.identifier,
         currentDatetime: String? = nil,
         currentDatetimeISO: String? = nil,
-        memoriesSection: String = "",
         memoriesStr: String = "",
         goalSection: String = "",
         fileContextSection: String = "",
