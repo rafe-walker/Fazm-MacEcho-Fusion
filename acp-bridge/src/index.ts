@@ -31,7 +31,7 @@ import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { createServer as createNetServer, type Socket } from "net";
 import { tmpdir } from "os";
-import { unlinkSync, appendFileSync, existsSync, watch, mkdirSync, writeFileSync } from "fs";
+import { unlinkSync, appendFileSync, existsSync, watch, mkdirSync } from "fs";
 import type {
   InboundMessage,
   OutboundMessage,
@@ -75,74 +75,16 @@ const whatsappMcpBinary = join(
 );
 
 // Google Workspace MCP — Python server bundled under Contents/Resources/google-workspace-mcp/
-// Source code lives in the app bundle (read-only). The venv is either:
-// - In the bundle (dev builds, created by run.sh)
-// - In ~/Library/Application Support/Fazm/google-workspace-mcp/ (release builds, downloaded from GCS)
-const gwsMcpBundleDir = join(
+// Both source code and .venv are bundled in the app (created during CI build).
+const gwsMcpDir = join(
   dirname(process.execPath),
   "..",
   "..",
   "Resources",
   "google-workspace-mcp"
 );
-const gwsMcpAppSupportDir = join(
-  process.env.HOME || "",
-  "Library",
-  "Application Support",
-  "Fazm",
-  "google-workspace-mcp"
-);
-// Use dev bundle venv if it exists (local dev builds), otherwise use Application Support
-const gwsMcpDir = existsSync(join(gwsMcpBundleDir, ".venv", "bin", "python3"))
-  ? gwsMcpBundleDir
-  : gwsMcpAppSupportDir;
 const gwsMcpPython = join(gwsMcpDir, ".venv", "bin", "python3");
-const gwsMcpMain = join(gwsMcpBundleDir, "main.py");
-const GWS_MCP_TARBALL_URL = "https://storage.googleapis.com/fazm-prod-releases/google-workspace-mcp/gws-mcp-venv.tar.gz";
-let gwsMcpDownloading = false;
-
-async function ensureGwsVenv(): Promise<boolean> {
-  if (gwsMcpDownloading) return false;
-  if (existsSync(gwsMcpPython)) return true;
-
-  // Check that the source code is bundled (main.py must exist)
-  if (!existsSync(gwsMcpMain)) {
-    logErr("Google Workspace MCP: main.py not found in bundle, skipping");
-    return false;
-  }
-
-  // Download pre-built venv tarball from GCS (first launch, ~38 MB)
-  gwsMcpDownloading = true;
-  logErr("Google Workspace MCP: downloading venv tarball (first launch)...");
-  try {
-    mkdirSync(gwsMcpAppSupportDir, { recursive: true });
-    const tarballPath = join(gwsMcpAppSupportDir, "gws-mcp-venv.tar.gz");
-
-    const res = await fetch(GWS_MCP_TARBALL_URL);
-    if (!res.ok) {
-      logErr(`Google Workspace MCP: tarball download failed: ${res.status} ${res.statusText}`);
-      return false;
-    }
-    const buffer = Buffer.from(await res.arrayBuffer());
-    writeFileSync(tarballPath, buffer);
-    logErr(`Google Workspace MCP: tarball downloaded (${Math.round(buffer.length / 1024 / 1024)} MB)`);
-
-    execSync(`tar -xzf "${tarballPath}" -C "${gwsMcpAppSupportDir}"`, {
-      stdio: ["ignore", "pipe", "pipe"],
-      timeout: 120000,
-    });
-
-    try { unlinkSync(tarballPath); } catch {}
-
-    logErr("Google Workspace MCP: venv extracted successfully");
-    return existsSync(join(gwsMcpAppSupportDir, ".venv", "bin", "python3"));
-  } catch (err) {
-    logErr(`Google Workspace MCP: venv download/extract failed: ${err}`);
-    return false;
-  } finally {
-    gwsMcpDownloading = false;
-  }
-}
+const gwsMcpMain = join(gwsMcpDir, "main.py");
 
 // Hindsight Memory MCP — Python HTTP server, venv bundled in app bundle
 const hindsightDir = join(dirname(process.execPath), "..", "..", "Resources", "hindsight");
@@ -1829,12 +1771,8 @@ async function main(): Promise<void> {
     logErr(`Hindsight: startup failed: ${err}`);
   });
 
-  // Ensure Google Workspace MCP venv exists (first launch installs from requirements.txt)
-  ensureGwsVenv().then((ready) => {
-    logErr(`Google Workspace MCP: ${ready ? "ready" : "not available"}`);
-  }).catch((err) => {
-    logErr(`Google Workspace MCP: venv setup failed: ${err}`);
-  });
+  // Check Google Workspace MCP availability (venv bundled in app)
+  logErr(`Google Workspace MCP: ${existsSync(gwsMcpPython) ? "ready" : "not available"}`);
 
   // Log browser diagnostics for debugging Playwright connection issues
   try {
