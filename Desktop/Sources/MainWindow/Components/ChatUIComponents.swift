@@ -450,6 +450,83 @@ struct ObserverCardView: View {
     }
 }
 
+// MARK: - Observer Card Stack
+
+struct ObserverCardItem: Identifiable {
+    let id: String
+    let activityId: Int64
+    let type: String
+    let content: String
+    let buttons: [ObserverCardButton]
+    let actedAction: String?
+}
+
+struct ObserverCardStackView: View {
+    let cards: [ObserverCardItem]
+    var onAction: ((Int64, String) -> Void)?
+
+    @State private var expanded: Bool = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header — tap to expand/collapse
+            HStack(spacing: 6) {
+                Image(systemName: "eye.circle.fill")
+                    .scaledFont(size: 11)
+                    .foregroundColor(FazmColors.purplePrimary.opacity(0.7))
+
+                Text("Observer noted \(cards.count) thing\(cards.count == 1 ? "" : "s")")
+                    .scaledFont(size: 11, weight: .medium)
+                    .foregroundColor(.white.opacity(0.5))
+
+                Spacer()
+
+                Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                    .scaledFont(size: 9)
+                    .foregroundColor(.white.opacity(0.3))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    expanded.toggle()
+                }
+            }
+
+            if expanded {
+                Divider()
+                    .background(FazmColors.purplePrimary.opacity(0.15))
+
+                ForEach(cards) { card in
+                    ObserverCardView(
+                        activityId: card.activityId,
+                        type: card.type,
+                        content: card.content,
+                        buttons: card.buttons,
+                        actedAction: card.actedAction,
+                        onAction: onAction
+                    )
+
+                    if card.id != cards.last?.id {
+                        Divider()
+                            .background(FazmColors.purplePrimary.opacity(0.1))
+                            .padding(.horizontal, 10)
+                    }
+                }
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(FazmColors.purplePrimary.opacity(0.06))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(FazmColors.purplePrimary.opacity(0.15), lineWidth: 0.5)
+                )
+        )
+    }
+}
+
 // MARK: - Typing Indicator
 
 struct TypingIndicator: View {
