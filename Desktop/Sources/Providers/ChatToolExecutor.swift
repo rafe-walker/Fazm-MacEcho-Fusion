@@ -24,6 +24,26 @@ class ChatToolExecutor {
 
     private static var fileScanFileCount = 0
 
+    // MARK: - Bundled Python
+
+    /// Path to the bundled Python 3.12 binary (from Hindsight venv in app bundle).
+    /// Used by browser profile tools so they don't depend on system Python or npx.
+    private static var bundledPython: String? = {
+        guard let resourceURL = Bundle.main.resourceURL else { return nil }
+        let python = resourceURL
+            .appendingPathComponent("hindsight")
+            .appendingPathComponent(".venv")
+            .appendingPathComponent("bin")
+            .appendingPathComponent("python3")
+            .path
+        return FileManager.default.fileExists(atPath: python) ? python : nil
+    }()
+
+    /// Path to the bundled ai-browser-profile directory in app Resources.
+    private static var bundledBrowserProfileDir: URL? = {
+        return Bundle.main.resourceURL?.appendingPathComponent("ai-browser-profile")
+    }()
+
     /// Execute a tool call and return the result as a string
     static func execute(_ toolCall: ToolCall) async -> String {
         log("Executing tool: \(toolCall.name) with args: \(toolCall.arguments)")
@@ -456,47 +476,57 @@ class ChatToolExecutor {
     private static func executeExtractBrowserProfile(_ args: [String: Any]) async -> String {
         let homeDir = FileManager.default.homeDirectoryForCurrentUser
         let aiBrowserProfileDir = homeDir.appendingPathComponent("ai-browser-profile")
-        let python = aiBrowserProfileDir.appendingPathComponent(".venv/bin/python").path
-        let extractScript = aiBrowserProfileDir.appendingPathComponent("extract.py").path
 
-        // Check if ai-browser-profile is installed, auto-install if not
-        if !FileManager.default.fileExists(atPath: python) ||
-           !FileManager.default.fileExists(atPath: extractScript) {
-            log("ai-browser-profile not found, installing via npx...")
-            let installResult = await Task.detached(priority: .userInitiated) {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-                process.arguments = ["npx", "ai-browser-profile", "init"]
-                process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
-                let pipe = Pipe()
-                process.standardOutput = pipe
-                process.standardError = pipe
-                do {
-                    try process.run()
-                    process.waitUntilExit()
-                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                    return (process.terminationStatus == 0, String(data: data, encoding: .utf8) ?? "")
-                } catch {
-                    return (false, "Failed to run npx: \(error.localizedDescription)")
+        // Resolve Python and extract script — prefer bundled, fall back to user-installed
+        let python: String
+        let extractScript: String
+        let workDir: URL
+
+        if let bundledDir = bundledBrowserProfileDir,
+           let bundledPy = bundledPython,
+           FileManager.default.fileExists(atPath: bundledDir.appendingPathComponent("extract.py").path) {
+            // Use bundled Python + bundled ai-browser-profile from app Resources
+            python = bundledPy
+            extractScript = bundledDir.appendingPathComponent("extract.py").path
+            // Work in ~/ai-browser-profile so memories.db lands in the user's home
+            workDir = aiBrowserProfileDir
+            // Ensure the user directory exists for output
+            try? FileManager.default.createDirectory(at: aiBrowserProfileDir, withIntermediateDirectories: true)
+            log("Using bundled Python and ai-browser-profile from app bundle")
+        } else {
+            // Fall back to user-installed ai-browser-profile
+            let userPython = aiBrowserProfileDir.appendingPathComponent(".venv/bin/python").path
+            let userExtract = aiBrowserProfileDir.appendingPathComponent("extract.py").path
+
+            if !FileManager.default.fileExists(atPath: userPython) ||
+               !FileManager.default.fileExists(atPath: userExtract) {
+                log("ai-browser-profile not found, installing via npx...")
+                let installResult = await Task.detached(priority: .userInitiated) {
+                    let process = Process()
+                    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+                    process.arguments = ["npx", "ai-browser-profile", "init"]
+                    process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
+                    let pipe = Pipe()
+                    process.standardOutput = pipe
+                    process.standardError = pipe
+                    do {
+                        try process.run()
+                        process.waitUntilExit()
+                        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                        return (process.terminationStatus == 0, String(data: data, encoding: .utf8) ?? "")
+                    } catch {
+                        return (false, "Failed to run npx: \(error.localizedDescription)")
+                    }
+                }.value
+
+                if !installResult.0 {
+                    return "Failed to install ai-browser-profile: \(installResult.1)"
                 }
-            }.value
-
-            if !installResult.0 {
-                return "Failed to install ai-browser-profile: \(installResult.1)\nUser can install manually: npx ai-browser-profile init"
             }
 
-            // Also install embeddings
-            let _ = await Task.detached(priority: .userInitiated) {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-                process.arguments = ["npx", "ai-browser-profile", "install-embeddings"]
-                process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
-                let pipe = Pipe()
-                process.standardOutput = pipe
-                process.standardError = pipe
-                try? process.run()
-                process.waitUntilExit()
-            }.value
+            python = userPython
+            extractScript = userExtract
+            workDir = aiBrowserProfileDir
         }
 
         // Run extraction — return as soon as the interim profile is printed (don't wait for embeddings)
