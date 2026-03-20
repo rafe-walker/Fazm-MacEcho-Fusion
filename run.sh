@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 
+# Acquire exclusive lock — prevents concurrent builds/tests by parallel agents
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/scripts/fazm-lock.sh"
+fazm_acquire_lock 300
+
 # Clear system OPENAI_API_KEY so .env takes precedence
 unset OPENAI_API_KEY
 
@@ -84,15 +89,6 @@ for stale_dir in "$HOME"/fazm-*/build "$HOME"/*/fazm/build "$HOME"/fazm/.claude/
         rm -rf "$stale"
     fi
 done
-
-# Check if another SwiftPM instance is running (will block our build)
-SWIFTPM_PID=$(pgrep -f "swiftpm-workspace-state|swift-build|swift-package" 2>/dev/null | head -1)
-if [ -n "$SWIFTPM_PID" ]; then
-    step "Waiting for other SwiftPM instance (PID: $SWIFTPM_PID) to finish..."
-    while kill -0 "$SWIFTPM_PID" 2>/dev/null; do
-        sleep 1
-    done
-fi
 
 step "Building acp-bridge (npm install + tsc)..."
 ACP_BRIDGE_DIR="$(dirname "$0")/acp-bridge"
