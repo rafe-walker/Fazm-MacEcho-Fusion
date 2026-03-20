@@ -248,8 +248,8 @@ async function startHindsight(): Promise<boolean> {
     hindsightProcess = null;
   });
 
-  // Wait for health check (up to 30s — first launch initializes Postgres)
-  for (let i = 0; i < 60; i++) {
+  // Wait for health check (up to 90s — first launch loads models + initializes Postgres)
+  for (let i = 0; i < 180; i++) {
     await new Promise(r => setTimeout(r, 500));
     try {
       const res = await fetch(`http://127.0.0.1:${HINDSIGHT_PORT}/health`);
@@ -259,7 +259,7 @@ async function startHindsight(): Promise<boolean> {
       }
     } catch {}
   }
-  logErr("Hindsight: health check timed out after 30s");
+  logErr("Hindsight: health check timed out after 90s");
   return false;
 }
 
