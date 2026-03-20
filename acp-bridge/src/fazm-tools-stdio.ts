@@ -797,6 +797,20 @@ async function handleJsonRpc(
             result: { content: [{ type: "text", text: result }] },
           });
         }
+      } else if (toolName === "save_observer_card") {
+        // Observer card tool — safely insert via hex encoding
+        const cardType = (args.type as string) || "insight";
+        const cardBody = (args.body as string) || "Observer update";
+        const safeInsert = buildObserverInsert(cardType, { body: cardBody });
+        await requestSwiftTool("execute_sql", { query: safeInsert });
+        notifyObserverCardReady();
+        if (!isNotification) {
+          send({
+            jsonrpc: "2.0",
+            id,
+            result: { content: [{ type: "text", text: "Card created." }] },
+          });
+        }
       } else if (toolName === "query_browser_profile" || toolName === "edit_browser_profile") {
         // Always-available tools — forward to Swift
         const result = await requestSwiftTool(toolName, args);
