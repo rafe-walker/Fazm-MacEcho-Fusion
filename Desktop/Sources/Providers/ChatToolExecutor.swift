@@ -39,6 +39,19 @@ class ChatToolExecutor {
         return FileManager.default.fileExists(atPath: python) ? python : nil
     }()
 
+    /// Path to the bundled Python venv root (PYTHONHOME).
+    /// python-build-standalone binaries have a hardcoded prefix (/install/lib/python3.12)
+    /// that doesn't exist on user machines. Setting PYTHONHOME overrides this so Python
+    /// finds its stdlib at $PYTHONHOME/lib/python3.12 inside the app bundle.
+    private static var bundledPythonHome: String? = {
+        guard let resourceURL = Bundle.main.resourceURL else { return nil }
+        let venv = resourceURL
+            .appendingPathComponent("hindsight")
+            .appendingPathComponent(".venv")
+            .path
+        return FileManager.default.fileExists(atPath: venv) ? venv : nil
+    }()
+
     /// Path to the bundled ai-browser-profile directory in app Resources.
     private static var bundledBrowserProfileDir: URL? = {
         return Bundle.main.resourceURL?.appendingPathComponent("ai-browser-profile")
@@ -531,6 +544,7 @@ class ChatToolExecutor {
 
         // Capture bundled dir path before entering detached task (actor isolation)
         let bundledDirPath = bundledBrowserProfileDir?.path
+        let pythonHome = bundledPythonHome
 
         // Run extraction — return as soon as the interim profile is printed (don't wait for embeddings)
         let result = await Task.detached(priority: .userInitiated) { () -> String in
@@ -540,10 +554,14 @@ class ChatToolExecutor {
             process.currentDirectoryURL = workDir
 
             // Set PYTHONPATH so the bundled ai_browser_profile module is importable
+            // Set PYTHONHOME so python-build-standalone finds its stdlib in the app bundle
             var env = ProcessInfo.processInfo.environment
             if let bp = bundledDirPath {
                 let existing = env["PYTHONPATH"] ?? ""
                 env["PYTHONPATH"] = existing.isEmpty ? bp : "\(bp):\(existing)"
+            }
+            if let ph = pythonHome {
+                env["PYTHONHOME"] = ph
             }
             process.environment = env
 
