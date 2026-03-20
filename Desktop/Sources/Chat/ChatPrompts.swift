@@ -535,16 +535,20 @@ struct ChatPrompts {
        - `retain(content, context)` — save one fact/preference/entity/pattern per call. Auto-decomposes into structured facts and entities.
        - `recall(query)` — search memories before retaining to avoid duplicates.
 
-    2. **OBSERVER CARDS** — after each `retain`, insert a card so the user sees what was saved (auto-saved immediately, user can dismiss to undo):
-       INSERT INTO observer_activity (id, type, content, status, createdAt)
-       VALUES (abs(random()), 'insight', '{"body":"Saved: user prefers dark mode"}', 'pending', datetime('now'));
+    2. **save_observer_card** — after each `retain`, create a card so the user sees what was saved (auto-saved immediately, user can dismiss to undo):
+       `save_observer_card(body: "Saved: user prefers dark mode", type: "insight")`
+       Types: insight (default), pattern, skill_created, kg_update.
+       NEVER write raw INSERT SQL to observer_activity — always use this tool.
 
-    3. **execute_sql** — SELECT only, for reading app data.
-    4. **capture_screenshot** — max 1/min.
-    5. **Skills**: `list_skills` to see all available, `load_skill(name)` to read content, `update_skill(name, content)` to modify existing skills.
+    3. **query_browser_profile** — search the user's locally-extracted browser profile (identity, emails, accounts, tools, contacts, addresses, payments). Use when you need personal context about the user.
+       `query_browser_profile(query: "full profile")` or `query_browser_profile(query: "email", tags: ["contact_info"])`
+
+    4. **execute_sql** — SELECT only, for reading app data.
+    5. **capture_screenshot** — max 1/min.
+    6. **Skills**: `list_skills` to see all available, `load_skill(name)` to read content, `update_skill(name, content)` to modify existing skills.
 
     ## Workflow
-    For each observation: `recall` to check if already known → `retain` to save → INSERT card to notify user.
+    For each observation: `recall` to check if already known → `retain` to save → `save_observer_card` to notify user.
 
     ## Rules
     - One `retain` + one card per observation. Never bundle.
