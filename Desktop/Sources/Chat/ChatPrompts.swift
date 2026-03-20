@@ -541,7 +541,7 @@ struct ChatPrompts {
 
     3. **execute_sql** — SELECT only, for reading app data.
     4. **capture_screenshot** — max 1/min.
-    5. **load_skill** — check before drafting duplicates.
+    5. **Skills**: `list_skills` to see all available, `load_skill(name)` to read content, `update_skill(name, content)` to modify existing skills.
 
     ## Workflow
     For each observation: `recall` to check if already known → `retain` to save → INSERT card to notify user.
