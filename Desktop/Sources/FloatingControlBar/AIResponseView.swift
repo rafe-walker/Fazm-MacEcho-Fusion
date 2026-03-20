@@ -370,7 +370,19 @@ struct AIResponseView: View {
     private func contentBlocksView(for message: ChatMessage) -> some View {
         if !message.contentBlocks.isEmpty {
             let grouped = ContentBlockGroup.group(message.contentBlocks)
-            ForEach(grouped) { group in
+            let observerCards = grouped.compactMap { group -> (id: String, activityId: Int64, type: String, content: String, buttons: [ObserverCardButton], actedAction: String?)? in
+                if case .observerCard(let id, let activityId, let type, let content, let buttons, let actedAction) = group {
+                    return (id, activityId, type, content, buttons, actedAction)
+                }
+                return nil
+            }
+            let nonObserverGroups = grouped.filter {
+                if case .observerCard = $0 { return false }
+                return true
+            }
+
+            // Render non-observer blocks normally
+            ForEach(nonObserverGroups) { group in
                 switch group {
                 case .text(_, let text):
                     SelectableMarkdown(text: text, sender: .ai)
@@ -386,19 +398,29 @@ struct AIResponseView: View {
                 case .discoveryCard(_, let title, let summary, let fullText):
                     DiscoveryCard(title: title, summary: summary, fullText: fullText)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                case .observerCard(_, let activityId, let type, let content, let buttons, let actedAction):
-                    ObserverCardView(
-                        activityId: activityId,
-                        type: type,
-                        content: content,
-                        buttons: buttons,
-                        actedAction: actedAction,
-                        onAction: { id, action in
-                            handleObserverCardAction(activityId: id, action: action)
-                        }
-                    )
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                case .observerCard:
+                    EmptyView() // handled below
                 }
+            }
+
+            // Render observer cards as a compact stack
+            if !observerCards.isEmpty {
+                ObserverCardStackView(
+                    cards: observerCards.map { card in
+                        ObserverCardItem(
+                            id: card.id,
+                            activityId: card.activityId,
+                            type: card.type,
+                            content: card.content,
+                            buttons: card.buttons,
+                            actedAction: card.actedAction
+                        )
+                    },
+                    onAction: { id, action in
+                        handleObserverCardAction(activityId: id, action: action)
+                    }
+                )
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         } else if !message.text.isEmpty {
             SelectableMarkdown(text: message.text, sender: .ai)
