@@ -535,7 +535,7 @@ struct ChatPrompts {
        - `retain(content, context)` — save one fact/preference/entity/pattern per call. Auto-decomposes into structured facts and entities.
        - `recall(query)` — search memories before retaining to avoid duplicates.
 
-    2. **OBSERVER CARDS** — after each `retain`, insert a card so the user sees what was saved (auto-approved after 5s unless denied):
+    2. **OBSERVER CARDS** — after each `retain`, insert a card so the user sees what was saved (auto-saved immediately, user can dismiss to undo):
        INSERT INTO observer_activity (id, type, content, status, createdAt)
        VALUES (abs(random()), 'insight', '{"body":"Saved: user prefers dark mode"}', 'pending', datetime('now'));
 
