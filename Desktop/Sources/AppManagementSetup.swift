@@ -7,7 +7,17 @@ final class AppManagementSetupWindowController {
     private var window: NSWindow?
     private var hostingView: NSHostingView<AnyView>?
 
+    /// Show the guide in its initial "steps" state.
     func show(version: String, onDone: @escaping () -> Void, onDismiss: @escaping () -> Void) {
+        showView(version: version, startGranted: false, onDone: onDone, onDismiss: onDismiss)
+    }
+
+    /// Show the guide in its "done" state (permission already granted, e.g. after relaunch).
+    func showDone(version: String, onDone: @escaping () -> Void, onDismiss: @escaping () -> Void) {
+        showView(version: version, startGranted: true, onDone: onDone, onDismiss: onDismiss)
+    }
+
+    private func showView(version: String, startGranted: Bool, onDone: @escaping () -> Void, onDismiss: @escaping () -> Void) {
         // If already showing, just bring to front
         if let existing = window, existing.isVisible {
             existing.makeKeyAndOrderFront(nil)
@@ -17,6 +27,7 @@ final class AppManagementSetupWindowController {
         let controller = self
         let setupView = AppManagementSetupView(
             version: version,
+            startGranted: startGranted,
             onDone: {
                 onDone()
                 controller.close()
@@ -62,6 +73,7 @@ final class AppManagementSetupWindowController {
 /// Step-by-step guide for granting App Management permission so Sparkle can install updates.
 struct AppManagementSetupView: View {
     let version: String
+    let startGranted: Bool
     var onDone: () -> Void
     var onDismiss: () -> Void
 
@@ -139,7 +151,7 @@ struct AppManagementSetupView: View {
             .padding(.horizontal, 40)
             .padding(.bottom, 24)
         }
-        .frame(width: 460, height: 440)
+        .frame(width: 460, height: permissionGranted ? 380 : 480)
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(FazmColors.backgroundSecondary)
@@ -149,6 +161,11 @@ struct AppManagementSetupView: View {
                 )
         )
         .animation(.easeInOut(duration: 0.3), value: permissionGranted)
+        .onAppear {
+            if startGranted {
+                permissionGranted = true
+            }
+        }
         .onDisappear {
             if let observer = appBecameActiveObserver {
                 NotificationCenter.default.removeObserver(observer)
@@ -178,6 +195,7 @@ struct AppManagementSetupView: View {
                 stepRow(number: "1", text: "Click \"Open System Settings\" below", done: settingsOpened)
                 stepRow(number: "2", text: "Find \(appName) in the App Management list", done: false, dimmed: !settingsOpened)
                 stepRow(number: "3", text: "Toggle it on", done: false, dimmed: !settingsOpened)
+                stepRow(number: "4", text: "macOS will ask to \"Quit & Reopen\" — allow it", done: false, dimmed: !settingsOpened)
             }
             .padding(.horizontal, 44)
             .padding(.top, 8)
@@ -254,7 +272,6 @@ struct AppManagementSetupView: View {
             object: nil,
             queue: .main
         ) { _ in
-            // Probe: try writing a temp file inside our own app bundle to check App Management
             probeAppManagementPermission()
         }
     }
