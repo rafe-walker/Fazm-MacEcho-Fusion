@@ -67,11 +67,24 @@ final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {
             AnalyticsManager.shared.updateAvailable(version: version)
             self.viewModel?.updateAvailable = true
             self.viewModel?.availableVersion = version
+        }
+    }
 
-            // Show App Management permission guide on first update (before Sparkle tries to install)
-            if !UserDefaults.standard.bool(forKey: "hasSuccessfullyInstalledSparkleUpdate") {
+    /// Called before Sparkle shows the update UI. Throw to block the update dialog.
+    /// We use this to show our App Management permission guide instead of Sparkle's dialog
+    /// when the user hasn't granted permission yet.
+    func updater(_ updater: SPUUpdater, shouldProceedWithUpdate updateItem: SUAppcastItem, updateCheck: SPUUpdateCheck) throws {
+        let version = updateItem.displayVersionString
+        if !UserDefaults.standard.bool(forKey: "hasSuccessfullyInstalledSparkleUpdate") {
+            logSync("Sparkle: Blocking update dialog — showing App Management guide for v\(version)")
+            Task { @MainActor in
                 self.viewModel?.showAppManagementGuideIfNeeded(version: version)
             }
+            throw NSError(
+                domain: "com.fazm.updater",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Waiting for App Management permission"]
+            )
         }
     }
 
