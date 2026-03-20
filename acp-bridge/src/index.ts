@@ -1003,15 +1003,10 @@ function buildMeta(systemPrompt?: string, sessionKey?: string): Record<string, u
 // --- Observer session: conversation batching ---
 
 const observerBuffer: Array<{ role: string; text: string }> = [];
-let observerBatchTimer: ReturnType<typeof setTimeout> | null = null;
-const OBSERVER_BATCH_SIZE = 3;        // Send batch every N turn pairs
-const OBSERVER_IDLE_TIMEOUT_MS = 5000;  // Or after 5s of idle
+const OBSERVER_BATCH_SIZE = 10;       // Send batch every N turn pairs
 
 function bufferObserverTurn(role: string, text: string): void {
   observerBuffer.push({ role, text });
-  // Reset idle timer
-  if (observerBatchTimer) clearTimeout(observerBatchTimer);
-  observerBatchTimer = setTimeout(() => flushObserverBatch(), OBSERVER_IDLE_TIMEOUT_MS);
   // Flush if we hit batch size (count turn pairs, not individual messages)
   const turnPairs = Math.floor(observerBuffer.length / 2);
   if (turnPairs >= OBSERVER_BATCH_SIZE) {
@@ -1028,11 +1023,6 @@ async function flushObserverBatch(): Promise<void> {
     logErr("Observer: already running, will retry after current batch completes");
     return;
   }
-  if (observerBatchTimer) {
-    clearTimeout(observerBatchTimer);
-    observerBatchTimer = null;
-  }
-
   const observerSession = sessions.get("observer");
   if (!observerSession) {
     logErr("Observer: no session found, skipping batch");
