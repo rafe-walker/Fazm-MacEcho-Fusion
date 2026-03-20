@@ -1670,6 +1670,12 @@ class ChatProvider: ObservableObject {
     /// Session key of the currently running sendMessage call, so follow-ups can be chained on the same session.
     private var activeSessionKey: String?
 
+    /// Stop the ACP bridge and all its child processes (MCP servers).
+    /// Called during app termination to prevent orphaned processes.
+    func stopBridge() {
+        Task { await acpBridge.stop() }
+    }
+
     /// Stop the running agent, keeping partial response
     func stopAgent() {
         guard isSending else { return }
