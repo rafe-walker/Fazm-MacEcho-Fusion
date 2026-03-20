@@ -360,8 +360,7 @@ workflows:
               --exclude='*.pyc' --exclude='.ruff_cache' --exclude='tests' \
               --exclude='docs' --exclude='build' --exclude='dist' --exclude='*.egg-info' \
               /tmp/google_workspace_mcp/ "$WORKSPACE_MCP_BUNDLE/"
-            # Extract dependencies to requirements.txt — venv is created at runtime
-            # (bundling a venv with absolute symlinks breaks Gatekeeper)
+            # Extract dependencies to requirements.txt (used by venv build step below)
             python3 -c 'import tomllib; f=open("/tmp/google_workspace_mcp/pyproject.toml","rb"); deps=tomllib.load(f)["project"]["dependencies"]; [print(d) for d in deps]' > "$WORKSPACE_MCP_BUNDLE/requirements.txt" 2>/dev/null || true
             echo "Bundled Google Workspace MCP source"
           else
