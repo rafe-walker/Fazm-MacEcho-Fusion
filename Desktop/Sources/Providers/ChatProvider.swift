@@ -2688,16 +2688,21 @@ class ChatProvider: ObservableObject {
         Task {
             guard let dbQueue = await AppDatabase.shared.getDatabaseQueue() else { return }
             do {
+                // Check if this is a rollback (dismiss after auto-approve)
+                let previousResponse: String? = try await dbQueue.read { db in
+                    try String.fetchOne(db, sql: "SELECT userResponse FROM observer_activity WHERE id = ?", arguments: [activityId])
+                }
+                let isRollback = action == "dismiss" && previousResponse == "approve"
+
                 try await dbQueue.write { db in
                     try db.execute(sql: """
-                        UPDATE observer_activity SET status = 'acted', userResponse = ?, actedAt = datetime('now')
+                        UPDATE observer_activity SET status = 'dismissed', userResponse = ?, actedAt = datetime('now')
                         WHERE id = ?
                     """, arguments: [action, activityId])
                 }
-                log("ChatProvider: Observer card action — id=\(activityId) action=\(action)")
+                log("ChatProvider: Observer card action — id=\(activityId) action=\(action)\(isRollback ? " (rollback)" : "")")
 
                 // Track the user's response to the observer card
-                // Fetch the card type for richer analytics
                 let cardType: String? = try await dbQueue.read { db in
                     try String.fetchOne(db, sql: "SELECT type FROM observer_activity WHERE id = ?", arguments: [activityId])
                 }
@@ -2705,11 +2710,15 @@ class ChatProvider: ObservableObject {
                     "activity_id": activityId,
                     "action": action,
                     "card_type": cardType ?? "unknown",
+                    "is_rollback": isRollback,
                 ])
 
-                // Execute pending operations on approval
                 if action == "approve" {
+                    // Execute pending operations on approval
                     await executeApprovedObserverOperations(activityId: activityId)
+                } else if isRollback {
+                    // Roll back previously approved operations
+                    await rollbackObserverOperations(activityId: activityId)
                 }
             } catch {
                 log("ChatProvider: Failed to update observer card: \(error)")
@@ -2784,6 +2793,142 @@ class ChatProvider: ObservableObject {
             log("ChatProvider: Observer created skill at \(skillFile.path)")
         } catch {
             log("ChatProvider: Failed to create skill from observer draft: \(error)")
+        }
+    }
+
+    /// Roll back previously approved observer operations (user clicked deny after auto-approve)
+    private func rollbackObserverOperations(activityId: Int64) async {
+        guard let dbQueue = await AppDatabase.shared.getDatabaseQueue() else { return }
+        do {
+            let row = try await dbQueue.read { db in
+                try Row.fetchOne(db, sql: "SELECT type, content FROM observer_activity WHERE id = ?", arguments: [activityId])
+            }
+            guard let contentJson: String = row?["content"],
+                  let type: String = row?["type"],
+                  let jsonData = contentJson.data(using: .utf8),
+                  let parsed = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else {
+                log("ChatProvider: Observer rollback — no content for id=\(activityId)")
+                return
+            }
+
+            // Roll back skill drafts: delete the created skill file
+            if type == "skill_draft" {
+                if let draftSkill = parsed["draft_skill"] as? [String: Any],
+                   let skillName = draftSkill["name"] as? String {
+                    let skillDir = FileManager.default.homeDirectoryForCurrentUser
+                        .appendingPathComponent(".claude/skills/\(skillName)")
+                    let skillFile = skillDir.appendingPathComponent("SKILL.md")
+                    try? FileManager.default.removeItem(at: skillFile)
+                    // Remove the directory if it's now empty
+                    let contents = try? FileManager.default.contentsOfDirectory(atPath: skillDir.path)
+                    if contents?.isEmpty == true {
+                        try? FileManager.default.removeItem(at: skillDir)
+                    }
+                    log("ChatProvider: Rolled back skill draft — deleted \(skillFile.path)")
+                }
+                return
+            }
+
+            // Roll back insight cards: delete the matching memory from Hindsight
+            if type == "insight" {
+                if let body = parsed["body"] as? String {
+                    await rollbackHindsightMemory(bodyText: body)
+                }
+            }
+
+            // Roll back pending SQL operations if rollback_operations are provided
+            if let rollbackOps = parsed["rollback_operations"] as? [[String: Any]] {
+                for op in rollbackOps {
+                    if let tool = op["tool"] as? String, tool == "execute_sql",
+                       let args = op["args"] as? [String: Any],
+                       let query = args["query"] as? String {
+                        log("ChatProvider: Executing rollback SQL: \(query.prefix(200))")
+                        try await dbQueue.write { db in
+                            try db.execute(sql: query)
+                        }
+                    }
+                }
+            }
+
+            log("ChatProvider: Rolled back observer operations for id=\(activityId)")
+        } catch {
+            log("ChatProvider: Failed to rollback observer operations: \(error)")
+        }
+    }
+
+    /// Delete the Hindsight memory that matches the observer card body text
+    private func rollbackHindsightMemory(bodyText: String) async {
+        // Search Hindsight for the memory that matches this card's body
+        let hindsightPort = 18888
+        guard let searchUrl = URL(string: "http://127.0.0.1:\(hindsightPort)/mcp/default/") else { return }
+
+        // Search for matching memories using list_memories with the body text as query
+        var searchRequest = URLRequest(url: searchUrl)
+        searchRequest.httpMethod = "POST"
+        searchRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        // Strip "Saved: " prefix if present for better search matching
+        let searchQuery = bodyText.hasPrefix("Saved: ") ? String(bodyText.dropFirst(7)) : bodyText
+        let searchBody: [String: Any] = [
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": [
+                "name": "list_memories",
+                "arguments": ["q": searchQuery, "limit": 5]
+            ]
+        ]
+        searchRequest.httpBody = try? JSONSerialization.data(withJSONObject: searchBody)
+
+        do {
+            let (data, _) = try await URLSession.shared.data(for: searchRequest)
+            // Parse SSE response — Hindsight returns "event: message\ndata: {...}\n\n"
+            guard let responseStr = String(data: data, encoding: .utf8) else {
+                log("ChatProvider: Hindsight rollback — empty response")
+                return
+            }
+            // Extract JSON from SSE data line
+            let jsonStr: String
+            if let dataRange = responseStr.range(of: "data: ") {
+                jsonStr = String(responseStr[dataRange.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            } else {
+                jsonStr = responseStr
+            }
+            guard let jsonData = jsonStr.data(using: .utf8),
+                  let response = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+                  let result = response["result"] as? [String: Any],
+                  let content = result["content"] as? [[String: Any]],
+                  let textContent = content.first(where: { ($0["type"] as? String) == "text" }),
+                  let text = textContent["text"] as? String,
+                  let memoriesData = text.data(using: .utf8),
+                  let memoriesResponse = try? JSONSerialization.jsonObject(with: memoriesData) as? [String: Any],
+                  let memories = memoriesResponse["memories"] as? [[String: Any]],
+                  let firstMemory = memories.first,
+                  let memoryId = firstMemory["id"] as? String else {
+                log("ChatProvider: Hindsight rollback — no matching memory found for: \(searchQuery.prefix(100))")
+                return
+            }
+
+            // Delete the matching memory
+            var deleteRequest = URLRequest(url: searchUrl)
+            deleteRequest.httpMethod = "POST"
+            deleteRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            let deleteBody: [String: Any] = [
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "tools/call",
+                "params": [
+                    "name": "delete_memory",
+                    "arguments": ["memory_id": memoryId]
+                ]
+            ]
+            deleteRequest.httpBody = try? JSONSerialization.data(withJSONObject: deleteBody)
+
+            let (_, deleteResponse) = try await URLSession.shared.data(for: deleteRequest)
+            let statusCode = (deleteResponse as? HTTPURLResponse)?.statusCode ?? 0
+            log("ChatProvider: Hindsight rollback — deleted memory \(memoryId) (status=\(statusCode))")
+        } catch {
+            log("ChatProvider: Hindsight rollback failed: \(error)")
         }
     }
 
