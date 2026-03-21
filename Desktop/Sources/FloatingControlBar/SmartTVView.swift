@@ -58,7 +58,9 @@ struct SmartTVView: NSViewRepresentable {
             } else if url.contains("/shorts/") {
                 // On Shorts player page: navigation done, let YouTube autoplay
                 SmartTVController.shared.navigationFinished()
-                log("SmartTV: on Shorts player, navigation finished")
+                // Ensure video starts muted
+                webView.evaluateJavaScript("document.querySelectorAll('video').forEach(v => v.muted = true)")
+                log("SmartTV: on Shorts player, navigation finished (muted)")
             } else {
                 SmartTVController.shared.navigationFinished()
             }
