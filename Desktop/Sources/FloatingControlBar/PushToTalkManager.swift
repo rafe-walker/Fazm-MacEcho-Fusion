@@ -681,7 +681,7 @@ class PushToTalkManager: ObservableObject {
           },
           onAudioLevel: { [weak self] level in
             Task { @MainActor in
-              self?.barState?.voiceAudioLevel = level
+              self?.barState?.audioLevel.level = level
               if level > 0.01 {
                 log("PushToTalkManager: audioLevel=\(String(format: "%.3f", level))")
               }
@@ -770,7 +770,7 @@ class PushToTalkManager: ObservableObject {
     log("PushToTalkManager: updateBarState — isVoiceListening=\(barState.isVoiceListening), showingAIConversation=\(barState.showingAIConversation), showingAIResponse=\(barState.showingAIResponse), chatWasOpenBeforePTT=\(chatWasOpenBeforePTT), pttOpenedChat=\(pttOpenedChat)")
     if state == .idle {
       barState.voiceTranscript = ""
-      barState.voiceAudioLevel = 0.0
+      barState.audioLevel.level = 0.0
     }
 
     // Skip resize when PTT opened the chat or expanded AI conversation
