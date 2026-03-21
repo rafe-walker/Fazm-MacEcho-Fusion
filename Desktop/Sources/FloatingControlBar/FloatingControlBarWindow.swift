@@ -578,6 +578,11 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
         state.isInitialising = isInitialising
     }
 
+    /// Extra height to add when Smart TV is showing, so the video sits above the chat.
+    private var smartTVExtraHeight: CGFloat {
+        ShortcutSettings.shared.smartTVEnabled ? Self.smartTVHeight : 0
+    }
+
     func showAIConversation() {
         // Check if we have existing conversation to restore — if so, skip the input-only
         // view and go straight to the response/chat view with history visible.
@@ -593,7 +598,7 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
             let savedWidth = UserDefaults.standard.string(forKey: FloatingControlBarWindow.sizeKey)
                 .map(NSSizeFromString)?.width ?? 0
             let inputWidth = max(FloatingControlBarWindow.expandedWidth, savedWidth)
-            let inputSize = NSSize(width: inputWidth, height: 146)
+            let inputSize = NSSize(width: inputWidth, height: 146 + smartTVExtraHeight)
             resizeAnchored(to: inputSize, makeResizable: false, animated: true)
         }
         // When shouldShowResponse is true, we skip the small resize and go straight
@@ -677,7 +682,7 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
         let savedWidth = UserDefaults.standard.string(forKey: FloatingControlBarWindow.sizeKey)
             .map(NSSizeFromString)?.width ?? 0
         let inputWidth = max(FloatingControlBarWindow.expandedWidth, savedWidth)
-        let inputSize = NSSize(width: inputWidth, height: 146)
+        let inputSize = NSSize(width: inputWidth, height: 146 + smartTVExtraHeight)
         resizeAnchored(to: inputSize, makeResizable: false, animated: true)
         state.inputViewHeight = 146
         setupInputHeightObserver()
