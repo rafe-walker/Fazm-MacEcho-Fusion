@@ -343,12 +343,6 @@ class PushToTalkManager: ObservableObject {
     AnalyticsManager.shared.floatingBarPTTStarted(mode: "hold")
     updateBarState()
 
-    // Show inline voice indicator when PTT starts in an already-open conversation
-    if chatWasOpenBeforePTT && barState?.showingAIResponse == true {
-      barState?.isVoiceFollowUp = true
-      barState?.voiceFollowUpTranscript = ""
-    }
-
     startAudioTranscription()
     startMaxDurationTimer()
     log("PushToTalkManager: started listening (hold mode, openedChat=\(pttOpenedChat))")
@@ -385,11 +379,6 @@ class PushToTalkManager: ObservableObject {
     AnalyticsManager.shared.floatingBarPTTStarted(mode: "locked")
 
     // Show inline voice indicator when PTT starts in an already-open conversation
-    if chatWasOpenBeforePTT && barState?.showingAIResponse == true {
-      barState?.isVoiceFollowUp = true
-      barState?.voiceFollowUpTranscript = ""
-    }
-
     // If we were already listening from the first tap, keep going.
     // Otherwise start fresh.
     if transcriptionService == nil {
@@ -417,8 +406,6 @@ class PushToTalkManager: ObservableObject {
     transcriptSegments = []
     lastInterimText = ""
     pttOpenedChat = false
-    barState?.isVoiceFollowUp = false
-    barState?.voiceFollowUpTranscript = ""
     batchAudioLock.lock()
     batchAudioBuffer = Data()
     batchAudioLock.unlock()
@@ -553,8 +540,6 @@ class PushToTalkManager: ObservableObject {
     state = .idle
     transcriptSegments = []
     lastInterimText = ""
-    barState?.isVoiceFollowUp = false
-    barState?.voiceFollowUpTranscript = ""
     updateBarState(skipResize: hasQuery || wasPttOpenedChat)
 
     guard hasQuery else {
@@ -738,11 +723,6 @@ class PushToTalkManager: ObservableObject {
       liveText = committed.isEmpty ? segment.text : committed + " " + segment.text
     }
     barState?.voiceTranscript = liveText
-
-    // Sync live transcript into the inline voice follow-up indicator
-    if barState?.isVoiceFollowUp == true {
-      barState?.voiceFollowUpTranscript = liveText
-    }
 
     // Sync live transcript directly into the input field
     if pttOpenedChat {
