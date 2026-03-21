@@ -30,13 +30,51 @@ struct FloatingControlBarView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Smart TV: YouTube Shorts above the chat (only when dialog is open)
-            if smartTVSettings.smartTVEnabled && state.showingAIConversation && !state.isCollapsed {
-                SmartTVView()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .padding(.horizontal, 8)
-                    .padding(.top, 8)
+            // Smart TV: YouTube Shorts above the chat (visible after query sent, hidden during input/collapse)
+            if smartTVSettings.smartTVEnabled && state.smartTVVisible {
+                ZStack {
+                    SmartTVView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                    // Mute/unmute overlay
+                    Button {
+                        state.smartTVMuted.toggle()
+                        SmartTVController.shared.setMuted(state.smartTVMuted)
+                    } label: {
+                        Image(systemName: state.smartTVMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                            .font(.system(size: 32))
+                            .foregroundColor(.white.opacity(0.7))
+                            .frame(width: 64, height: 64)
+                            .background(Color.black.opacity(0.4))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+
+                    // Hide TV button (top-right corner)
+                    VStack {
+                        HStack {
+                            Spacer()
+                            Button {
+                                state.smartTVHiddenByUser = true
+                                state.smartTVVisible = false
+                                SmartTVController.shared.pauseVideo(source: "user_hide")
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(.white.opacity(0.7))
+                                    .frame(width: 24, height: 24)
+                                    .background(Color.black.opacity(0.4))
+                                    .clipShape(Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .padding(8)
+                        }
+                        Spacer()
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.top, 8)
             }
 
             // AI conversation view - conditionally visible (expands upward above the bar)
