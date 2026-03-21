@@ -165,28 +165,25 @@ struct SmartTVView: NSViewRepresentable {
                         // Log diagnostics and DOM structure after a delay
                         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                             SmartTVController.shared.logVideoDiagnostics()
-                            // Dump scrollable containers to find the right target
+                            // Dump each ancestor on its own log line
                             let domJS = """
                             (function() {
                                 var video = document.querySelector('video');
-                                if (!video) return 'no video found';
+                                if (!video) { console.log('[Fazm] no video found'); return; }
                                 var el = video;
-                                var chain = [];
-                                while (el && el !== document.body) {
-                                    chain.push(el.tagName + (el.id ? '#' + el.id : '') +
-                                        (el.className ? '.' + String(el.className).substring(0,30) : '') +
-                                        ' scroll=' + el.scrollHeight + '/' + el.clientHeight +
-                                        ' overflow=' + getComputedStyle(el).overflow);
+                                var depth = 0;
+                                while (el && depth < 20) {
+                                    console.log('[Fazm] DOM[' + depth + '] ' + el.tagName +
+                                        (el.id ? '#' + el.id : '') +
+                                        ' class=' + (el.className || '').toString().substring(0,50) +
+                                        ' scrollH=' + el.scrollHeight + ' clientH=' + el.clientHeight +
+                                        ' overflow=' + getComputedStyle(el).overflowY);
                                     el = el.parentElement;
+                                    depth++;
                                 }
-                                return chain.join(' → ');
                             })();
                             """
-                            webView.evaluateJavaScript(domJS) { result, _ in
-                                if let info = result as? String {
-                                    log("SmartTV DOM chain: " + info)
-                                }
-                            }
+                            webView.evaluateJavaScript(domJS)
                         }
                     }
                 }
