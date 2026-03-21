@@ -87,7 +87,8 @@ class SmartTVController {
                   let parts = content["parts"] as? [[String: Any]],
                   let text = parts.first?["text"] as? String else {
                 let status = (resp as? HTTPURLResponse)?.statusCode ?? -1
-                log("SmartTV: Gemini query optimization failed (status=\(status))")
+                let body = String(data: data, encoding: .utf8) ?? ""
+                log("SmartTV: Gemini query optimization failed (status=\(status)): \(body.prefix(500))")
                 return nil
             }
             let result = text.trimmingCharacters(in: .whitespacesAndNewlines)
