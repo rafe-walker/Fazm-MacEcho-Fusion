@@ -122,6 +122,10 @@ actor ACPBridge {
     self.onObserverPoll = handler
   }
 
+  func setObserverStatusHandler(_ handler: @escaping @Sendable (_ running: Bool) -> Void) {
+    self.onObserverStatusChange = handler
+  }
+
   func setBackgroundToolCallHandler(_ handler: @escaping ToolCallHandler) {
     self.onBackgroundToolCall = handler
   }
