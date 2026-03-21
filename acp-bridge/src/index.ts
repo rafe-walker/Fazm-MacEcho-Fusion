@@ -953,7 +953,7 @@ async function flushObserverBatch(): Promise<void> {
   observerRunning = true;
   const batch = observerBuffer.splice(0);
   const batchText = batch.map(t => `[${t.role}]: ${t.text}`).join("\n\n");
-  const prompt = `Here are the latest conversation turns from the main session:\n\n${batchText}\n\nAnalyze these turns. Use Hindsight retain to save each distinct fact, preference, entity, or behavioral pattern you detect — one retain call per observation. If you detect a repeated workflow (3+ times), draft a skill.`;
+  const prompt = `Here are the latest conversation turns from the main session:\n\n${batchText}\n\nAnalyze these turns. Be conservative — only save things that are genuinely significant and useful for future conversations. Skip routine queries, transient context, and near-duplicates of things already saved. Always recall first to check what's already known. Use Hindsight retain for each truly new and important observation. If you detect a repeated workflow (3+ times), draft a skill.`;
 
   // Register a per-session notification handler so observer notifications
   // don't get swallowed by the main query's handler or vice versa.
@@ -982,6 +982,7 @@ async function flushObserverBatch(): Promise<void> {
 
   try {
     logErr(`Observer: sending batch of ${batch.length} messages`);
+    send({ type: "observer_status" as any, running: true } as any);
     await acpRequest("session/prompt", {
       sessionId: observerSession.sessionId,
       prompt: [{ type: "text", text: prompt }],
@@ -1001,6 +1002,7 @@ async function flushObserverBatch(): Promise<void> {
   } finally {
     sessionNotificationHandlers.delete(observerSession.sessionId);
     observerRunning = false;
+    send({ type: "observer_status" as any, running: false } as any);
 
     // If new messages accumulated while we were running, flush again
     if (observerBuffer.length > 0) {
