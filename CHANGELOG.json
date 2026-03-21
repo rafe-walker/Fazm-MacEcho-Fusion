@@ -124,6 +124,7 @@
     "Fixed browser profile and Hindsight failing on some machines due to bundled Python not finding its standard library",
     "Observer AI now uses dedicated tools instead of raw SQL, fixing card creation errors",
     "Browser profile now auto-extracts when queried for users who skipped the initial import",
-    "Fixed Hindsight Memory not starting on clean Macs (missing OpenSSL for embedded PostgreSQL)"
+    "Fixed Hindsight Memory not starting on clean Macs (missing OpenSSL for embedded PostgreSQL)",
+    "Fixed typing indicator (bouncing dots) lingering after AI response completes"
   ]
 }
