@@ -291,7 +291,7 @@ actor ACPBridge {
             // Capture the error reason from the line
             props["error"] = text.trimmingCharacters(in: .whitespacesAndNewlines)
           }
-          PostHogManager.shared.track("Hindsight Status", properties: props)
+          Task { @MainActor in PostHogManager.shared.track("Hindsight Status", properties: props) }
         }
       }
     }
