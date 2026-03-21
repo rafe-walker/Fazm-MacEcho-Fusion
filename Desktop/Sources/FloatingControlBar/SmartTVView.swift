@@ -43,24 +43,78 @@ struct SmartTVView: NSViewRepresentable {
             document.querySelectorAll('video').forEach(v => v.muted = true);
             if (!window.__fazmAutoAdvance) {
                 window.__fazmAutoAdvance = true;
-                function attachEndedListener(video) {
-                    if (video.__fazmEnded) return;
-                    video.__fazmEnded = true;
-                    video.loop = false;
-                    video.addEventListener('ended', function() {
-                        var container = document.querySelector('#shorts-container') ||
-                                        document.querySelector('ytm-shorts-player') ||
-                                        document.scrollingElement || document.body;
-                        container.scrollBy({ top: window.innerHeight, behavior: 'smooth' });
-                    });
+                console.log('[Fazm] auto-advance setup starting');
+
+                function advanceToNext() {
+                    console.log('[Fazm] advancing to next Short');
+                    // Try multiple scroll targets — YouTube Shorts layout varies
+                    var scrolled = false;
+                    var targets = [
+                        document.querySelector('ytm-shorts-player'),
+                        document.querySelector('#shorts-container'),
+                        document.querySelector('.reel-video-in-sequence'),
+                        document.scrollingElement,
+                        document.body
+                    ];
+                    for (var i = 0; i < targets.length; i++) {
+                        var t = targets[i];
+                        if (t && t.scrollHeight > t.clientHeight) {
+                            t.scrollBy({ top: window.innerHeight, behavior: 'smooth' });
+                            console.log('[Fazm] scrolled target: ' + (t.tagName || 'scrollingElement'));
+                            scrolled = true;
+                            break;
+                        }
+                    }
+                    if (!scrolled) {
+                        window.scrollBy({ top: window.innerHeight, behavior: 'smooth' });
+                        console.log('[Fazm] scrolled window as fallback');
+                    }
                 }
-                document.querySelectorAll('video').forEach(attachEndedListener);
-                new MutationObserver(function(mutations) {
+
+                function attachListener(video) {
+                    if (video.__fazmSetup) return;
+                    video.__fazmSetup = true;
+
+                    // Force loop off and prevent YouTube from re-enabling it
+                    video.loop = false;
+                    Object.defineProperty(video, 'loop', {
+                        get: function() { return false; },
+                        set: function(v) { /* block YouTube from re-enabling loop */ },
+                        configurable: true
+                    });
+
+                    // Use timeupdate as primary trigger — more reliable than 'ended'
+                    video.addEventListener('timeupdate', function() {
+                        if (video.duration > 0 && video.currentTime >= video.duration - 0.3) {
+                            if (!video.__fazmAdvancing) {
+                                video.__fazmAdvancing = true;
+                                console.log('[Fazm] video near end: ' + video.currentTime.toFixed(1) + '/' + video.duration.toFixed(1));
+                                advanceToNext();
+                            }
+                        }
+                    });
+
+                    // Also listen for ended as backup
+                    video.addEventListener('ended', function() {
+                        if (!video.__fazmAdvancing) {
+                            video.__fazmAdvancing = true;
+                            advanceToNext();
+                        }
+                    });
+
+                    console.log('[Fazm] attached listener to video, duration=' + video.duration);
+                }
+
+                document.querySelectorAll('video').forEach(attachListener);
+
+                new MutationObserver(function() {
                     document.querySelectorAll('video').forEach(function(v) {
                         v.muted = true;
-                        attachEndedListener(v);
+                        attachListener(v);
                     });
                 }).observe(document.body, { childList: true, subtree: true });
+
+                console.log('[Fazm] auto-advance setup complete');
             }
         })();
         """
