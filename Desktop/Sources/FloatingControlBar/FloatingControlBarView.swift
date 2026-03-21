@@ -22,6 +22,8 @@ struct FloatingControlBarView: View {
     var onObserverCardAction: ((Int64, String) -> Void)?
 
     @State private var isHovering = false
+    @State private var updatePulse = false
+    @ObservedObject private var updaterViewModel = UpdaterViewModel.shared
 
     var body: some View {
         VStack(spacing: 0) {
@@ -135,6 +137,9 @@ struct FloatingControlBarView: View {
                     .transition(.opacity)
             } else if isHovering || state.showingAIConversation {
                 VStack(spacing: 4) {
+                    if updaterViewModel.updateAvailable {
+                        updateButton
+                    }
                     compactButton(title: "Push to talk", keys: [shortcutSettings.pttKey.symbol]) {
                         onAskAI()
                     }
@@ -153,8 +158,53 @@ struct FloatingControlBarView: View {
     /// Minimal thin bar shown when not hovering
     private var compactCircleView: some View {
         RoundedRectangle(cornerRadius: 2)
-            .fill(Color.white.opacity(0.5))
+            .fill(updaterViewModel.updateAvailable ? FazmColors.purplePrimary : Color.white.opacity(0.5))
             .frame(width: 28, height: 4)
+            .shadow(
+                color: updaterViewModel.updateAvailable
+                    ? FazmColors.purplePrimary.opacity(updatePulse ? 0.9 : 0.2)
+                    : .clear,
+                radius: updatePulse ? 8 : 3
+            )
+            .onAppear {
+                if updaterViewModel.updateAvailable {
+                    withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                        updatePulse = true
+                    }
+                }
+            }
+            .onChange(of: updaterViewModel.updateAvailable) { available in
+                if available {
+                    updatePulse = false
+                    withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                        updatePulse = true
+                    }
+                } else {
+                    updatePulse = false
+                }
+            }
+    }
+
+    private var updateButton: some View {
+        Button {
+            updaterViewModel.checkForUpdates()
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.system(size: 10))
+                Text("Update")
+                    .scaledFont(size: 11, weight: .semibold)
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(FazmColors.purplePrimary)
+            )
+            .shadow(color: FazmColors.purplePrimary.opacity(updatePulse ? 0.8 : 0.2), radius: 6)
+        }
+        .buttonStyle(.plain)
     }
 
     private func compactToggle(_ title: String, isOn: Binding<Bool>) -> some View {
