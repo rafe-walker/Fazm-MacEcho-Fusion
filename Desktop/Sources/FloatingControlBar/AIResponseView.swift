@@ -185,6 +185,11 @@ struct AIResponseView: View {
                 .animation(.spring(response: 0.3, dampingFraction: 0.8), value: state.messageQueue.count)
             }
 
+            // Observer thinking indicator — shown near input, not per-message
+            if state.isObserverRunning {
+                observerThinkingIndicator
+            }
+
             if !isVoiceFollowUp {
                 followUpInputView
             }
@@ -403,8 +408,8 @@ struct AIResponseView: View {
                 }
             }
 
-            // Render observer cards as a compact stack
-            if !observerCards.isEmpty || state.isObserverRunning {
+            // Render observer cards as a compact stack (thinking state shown separately near input)
+            if !observerCards.isEmpty {
                 ObserverCardStackView(
                     cards: observerCards.map { card in
                         ObserverCardItem(
@@ -416,7 +421,6 @@ struct AIResponseView: View {
                             actedAction: card.actedAction
                         )
                     },
-                    isObserverRunning: state.isObserverRunning,
                     onAction: { id, action in
                         handleObserverCardAction(activityId: id, action: action)
                     }
@@ -688,6 +692,36 @@ struct AIResponseView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Observer Thinking Indicator
+
+    @State private var observerPulseOpacity: Double = 0.7
+
+    private var observerThinkingIndicator: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "eye.circle.fill")
+                .scaledFont(size: 11)
+                .foregroundColor(FazmColors.purplePrimary.opacity(observerPulseOpacity))
+                .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: observerPulseOpacity)
+                .onAppear { observerPulseOpacity = 0.3 }
+
+            Text("Observer is thinking...")
+                .scaledFont(size: 11, weight: .medium)
+                .foregroundColor(.white.opacity(0.4))
+
+            Spacer()
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(FazmColors.purplePrimary.opacity(0.06))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(FazmColors.purplePrimary.opacity(0.15), lineWidth: 0.5)
+                )
+        )
     }
 
     // MARK: - Follow-Up Input
