@@ -959,7 +959,7 @@ actor AppDatabase {
         migrator.registerMigration("fazmV4") { db in
             try db.create(table: "observer_activity") { t in
                 t.autoIncrementedPrimaryKey("id")
-                t.column("type", .text).notNull()           // "card", "insight", "skill_created", "kg_update", "pattern"
+                t.column("type", .text).notNull()           // "card", "insight", "skill_created", "pattern"
                 t.column("content", .text).notNull()         // JSON blob: {title, body, options, draft_skill, ...}
                 t.column("status", .text).notNull().defaults(to: "pending") // "pending", "shown", "acted", "dismissed"
                 t.column("userResponse", .text)              // which button was tapped (for cards)
