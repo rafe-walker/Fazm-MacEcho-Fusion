@@ -1085,6 +1085,9 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
             UserDefaults.standard.set(
                 NSStringFromSize(self.frame.size), forKey: FloatingControlBarWindow.sizeKey
             )
+            // Re-cap the auto-expand observer to the user's new height so it
+            // won't jump back above what the user chose.
+            setupResponseHeightObserver(maxHeight: self.frame.height)
         }
     }
 
