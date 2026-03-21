@@ -2130,6 +2130,12 @@ class ChatProvider: ObservableObject {
                 messages[index].isStreaming = false
                 completeRemainingToolCalls(messageId: aiMessageId)
 
+                // Yield the main actor so the Combine $messages sink (scheduled
+                // via .receive(on: .main)) fires now, updating the UI to remove
+                // the typing indicator immediately rather than waiting for the
+                // backend save network call to complete.
+                await Task.yield()
+
                 // Persist AI message locally for onboarding restart recovery
                 // Must happen before backend save which replaces the message ID
                 if isOnboarding, !messageText.isEmpty {
@@ -2298,6 +2304,7 @@ class ChatProvider: ObservableObject {
                 } else {
                     messages[index].isStreaming = false
                     completeRemainingToolCalls(messageId: aiMessageId)
+                    await Task.yield()  // Let UI update immediately
                     log("Bridge error after partial response — keeping \(messages[index].text.count) chars of streamed text")
                     // Still try to persist the partial response
                     let partialText = messages[index].text
