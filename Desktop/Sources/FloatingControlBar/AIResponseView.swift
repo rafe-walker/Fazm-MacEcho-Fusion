@@ -305,27 +305,6 @@ struct AIResponseView: View {
 
             Spacer()
 
-            if state.smartTVVisible {
-                Button {
-                    state.smartTVHiddenByUser = true
-                    state.smartTVVisible = false
-                    SmartTVController.shared.pauseVideo(source: "user_hide")
-                } label: {
-                    HStack(spacing: 3) {
-                        Image(systemName: "tv.slash")
-                            .font(.system(size: 10))
-                        Text("Hide TV")
-                            .scaledFont(size: 10)
-                    }
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(Color.white.opacity(0.08))
-                    .cornerRadius(4)
-                }
-                .buttonStyle(.plain)
-            }
-
             ReportIssueButton(isHanging: isHanging)
 
             CopyConversationButton(
