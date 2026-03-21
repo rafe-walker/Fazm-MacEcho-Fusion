@@ -162,9 +162,31 @@ struct SmartTVView: NSViewRepresentable {
                         SmartTVController.shared.navigationFinished()
                         webView.evaluateJavaScript(Self.autoAdvanceJS)
                         log("SmartTV: injected auto-advance after search→shorts SPA nav")
-                        // Log diagnostics after a delay to see video state
+                        // Log diagnostics and DOM structure after a delay
                         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                             SmartTVController.shared.logVideoDiagnostics()
+                            // Dump scrollable containers to find the right target
+                            let domJS = """
+                            (function() {
+                                var video = document.querySelector('video');
+                                if (!video) return 'no video found';
+                                var el = video;
+                                var chain = [];
+                                while (el && el !== document.body) {
+                                    chain.push(el.tagName + (el.id ? '#' + el.id : '') +
+                                        (el.className ? '.' + String(el.className).substring(0,30) : '') +
+                                        ' scroll=' + el.scrollHeight + '/' + el.clientHeight +
+                                        ' overflow=' + getComputedStyle(el).overflow);
+                                    el = el.parentElement;
+                                }
+                                return chain.join(' → ');
+                            })();
+                            """
+                            webView.evaluateJavaScript(domJS) { result, _ in
+                                if let info = result as? String {
+                                    log("SmartTV DOM chain: \\(info)")
+                                }
+                            }
                         }
                     }
                 }
