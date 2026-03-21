@@ -200,6 +200,79 @@ pub async fn get_release(
     Ok(from_firestore_doc(&doc))
 }
 
+/// Deactivate all live releases on a given channel, except for the specified tag.
+/// This ensures only one release is live per channel at any time.
+pub async fn deactivate_channel(
+    config: &Arc<Config>,
+    token: &str,
+    channel: &str,
+    except_tag: &str,
+) -> Result<u32, Box<dyn std::error::Error + Send + Sync>> {
+    let url = format!(
+        "https://firestore.googleapis.com/v1/projects/{}/databases/(default)/documents:runQuery",
+        config.firebase_project_id
+    );
+
+    // Query for is_live == true AND channel == <channel>
+    let query = serde_json::json!({
+        "structuredQuery": {
+            "from": [{ "collectionId": COLLECTION }],
+            "where": {
+                "compositeFilter": {
+                    "op": "AND",
+                    "filters": [
+                        {
+                            "fieldFilter": {
+                                "field": { "fieldPath": "is_live" },
+                                "op": "EQUAL",
+                                "value": { "booleanValue": true }
+                            }
+                        },
+                        {
+                            "fieldFilter": {
+                                "field": { "fieldPath": "channel" },
+                                "op": "EQUAL",
+                                "value": { "stringValue": channel }
+                            }
+                        }
+                    ]
+                }
+            },
+            "limit": 100
+        }
+    });
+
+    let resp: serde_json::Value = reqwest::Client::new()
+        .post(&url)
+        .bearer_auth(token)
+        .json(&query)
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
+
+    let docs: Vec<ReleaseDoc> = resp
+        .as_array()
+        .unwrap_or(&vec![])
+        .iter()
+        .filter_map(|r| r.get("document").and_then(|d| from_firestore_doc(d)))
+        .collect();
+
+    let mut deactivated = 0u32;
+    for doc in docs {
+        if doc.tag == except_tag {
+            continue;
+        }
+        let mut updated = doc;
+        updated.is_live = false;
+        upsert_release(config, token, &updated).await?;
+        deactivated += 1;
+    }
+
+    Ok(deactivated)
+}
+
 /// List all live release documents, ordered by descending build number.
 pub async fn list_live_releases(
     config: &Arc<Config>,

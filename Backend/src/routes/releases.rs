@@ -72,6 +72,13 @@ pub async fn register(
             .into_response();
     }
 
+    // Deactivate previous live releases on the staging channel
+    match firestore::deactivate_channel(&config, &token, "staging", &req.tag).await {
+        Ok(n) if n > 0 => tracing::info!("Deactivated {} previous staging release(s)", n),
+        Err(e) => tracing::warn!("Failed to deactivate old staging releases: {}", e),
+        _ => {}
+    }
+
     tracing::info!("Registered release {} as staging", req.tag);
 
     (
@@ -161,6 +168,13 @@ pub async fn promote(
             Json(serde_json::json!({"error": format!("write failed: {}", e)})),
         )
             .into_response();
+    }
+
+    // Deactivate previous live releases on the target channel
+    match firestore::deactivate_channel(&config, &token, new_channel, &req.tag).await {
+        Ok(n) if n > 0 => tracing::info!("Deactivated {} previous {} release(s)", n, new_channel),
+        Err(e) => tracing::warn!("Failed to deactivate old {} releases: {}", new_channel, e),
+        _ => {}
     }
 
     tracing::info!(
