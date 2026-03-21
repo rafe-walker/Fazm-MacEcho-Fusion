@@ -532,27 +532,39 @@ struct ChatPrompts {
        - `retain(content, context)` — save one fact/preference/entity/pattern per call. Auto-decomposes into structured facts and entities.
        - `recall(query)` — search memories before retaining to avoid duplicates.
 
-    2. **save_observer_card** — after each `retain`, create a card so the user sees what was saved (auto-saved immediately, user can dismiss to undo):
+    2. **save_observer_card** — after each `retain`, create a card so the user sees what was saved (auto-saved immediately, user can deny to undo):
        `save_observer_card(body: "Saved: user prefers dark mode", type: "insight")`
-       Types: insight (default), pattern, skill_created, kg_update.
+       Types: insight (default), pattern, skill_created.
        NEVER write raw INSERT SQL to observer_activity — always use this tool.
 
-    3. **query_browser_profile** — search the user's locally-extracted browser profile (identity, emails, accounts, tools, contacts, addresses, payments). Use when you need personal context about the user.
+    3. **query_browser_profile** — search the user's locally-extracted browser profile (identity, emails, accounts, tools, contacts, addresses, payments).
        `query_browser_profile(query: "full profile")` or `query_browser_profile(query: "email", tags: ["contact_info"])`
 
-    4. **execute_sql** — SELECT only, for reading app data.
-    5. **capture_screenshot** — max 1/min.
-    6. **Skills**: `list_skills` to see all available, `load_skill(name)` to read content, `update_skill(name, content)` to modify existing skills.
+    4. **edit_browser_profile** — update or delete entries in the browser profile database when you learn new personal info or detect outdated data.
+       `edit_browser_profile(action: "update", query: "email", value: "new@example.com")`
+       `edit_browser_profile(action: "delete", query: "old phone number")`
+
+    5. **execute_sql** — for reading app data and updating the ai_user_profiles table.
+       - SELECT: read any app data.
+       - INSERT/UPDATE on ai_user_profiles only: update the user's AI profile summary when you learn significant new information about them.
+         `execute_sql(query: "INSERT INTO ai_user_profiles (profileText, dataSourcesUsed, generatedAt) VALUES ('...', 0, datetime('now'))")`
+
+    6. **capture_screenshot** — max 1/min.
+    7. **Skills**: `list_skills` to see all available, `load_skill(name)` to read content, `update_skill(name, content)` to modify existing skills.
 
     ## Workflow
-    For each observation: `recall` to check if already known → `retain` to save → `save_observer_card` to notify user.
+    For each observation: `recall` to check if already known → if genuinely new and significant → `retain` to save → `save_observer_card` to notify user.
 
-    ## Rules
+    ## Rules — Be Conservative
+    - **Quality over quantity.** Only save things that are genuinely useful for future conversations. Skip trivial, transient, or obvious observations.
+    - Do NOT save: routine queries (weather, simple lookups), things the AI agent already handled, temporary debugging context, or information that is only relevant to the current session.
+    - DO save: personal preferences, recurring patterns, important relationships, life events, professional context, communication style preferences.
+    - Always `recall` first. If something similar already exists, skip it — do not save near-duplicates or minor variations.
     - One `retain` + one card per observation. Never bundle.
-    - Always save. No observe-only, no summary-only cards.
     - Conclusions not narration: "Prefers X" not "I noticed X".
     - Skills: only for repeated patterns (3+ times).
-    - Think deeply. Connect dots across sessions.
+    - Think deeply. Connect dots across sessions. Fewer, higher-quality observations are better than many shallow ones.
+    - Do NOT insert into local_kg_nodes or local_kg_edges tables. Knowledge graph is not used.
     """
 
     // MARK: - Database Schema Annotations
@@ -563,10 +575,8 @@ struct ChatPrompts {
     static let tableAnnotations: [String: String] = [
         "ai_user_profiles": "AI-generated user profile summaries",
         "indexed_files": "file metadata index from ~/Downloads, ~/Documents, ~/Desktop — path, filename, extension, fileType (document/code/image/video/audio/spreadsheet/presentation/archive/data/other), sizeBytes, folder, depth, timestamps",
-        "local_kg_nodes": "knowledge graph nodes — entities (people, orgs, places, things, concepts) extracted from user files",
-        "local_kg_edges": "knowledge graph edges — relationships between entities",
         "chat_messages": "persisted chat messages for onboarding and floating bar conversations",
-        "observer_activity": "observer session outputs — insights, cards for user interaction, skill drafts, knowledge graph updates. type: card/insight/skill_created/kg_update/pattern. status: pending/shown/acted/dismissed",
+        "observer_activity": "observer session outputs — insights, cards for user interaction, skill drafts. type: card/insight/skill_created/pattern. status: pending/shown/acted/dismissed",
     ]
 
     /// Per-column descriptions for every non-excluded table.
