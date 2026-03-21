@@ -67,27 +67,29 @@ struct SmartTVView: NSViewRepresentable {
 
                 function advanceToNext() {
                     console.log('[Fazm] advancing to next Short');
-                    // Try multiple scroll targets — YouTube Shorts layout varies
-                    var scrolled = false;
-                    var targets = [
-                        document.querySelector('ytm-shorts-player'),
-                        document.querySelector('#shorts-container'),
-                        document.querySelector('.reel-video-in-sequence'),
-                        document.scrollingElement,
-                        document.body
-                    ];
-                    for (var i = 0; i < targets.length; i++) {
-                        var t = targets[i];
-                        if (t && t.scrollHeight > t.clientHeight) {
-                            t.scrollBy({ top: window.innerHeight, behavior: 'smooth' });
-                            console.log('[Fazm] scrolled target: ' + (t.tagName || 'scrollingElement'));
-                            scrolled = true;
-                            break;
+                    // YouTube Shorts uses a carousel with overflow:hidden and scroll-snap
+                    var carousel = document.querySelector('#carousel-scrollable-wrapper');
+                    if (carousel) {
+                        var itemHeight = carousel.clientHeight;
+                        console.log('[Fazm] scrolling carousel by ' + itemHeight + 'px (scrollH=' + carousel.scrollHeight + ')');
+                        carousel.scrollBy({ top: itemHeight, behavior: 'smooth' });
+                    } else {
+                        // Fallback: try other known containers
+                        var targets = ['#shorts-container', 'ytm-shorts-player'];
+                        var scrolled = false;
+                        for (var i = 0; i < targets.length; i++) {
+                            var t = document.querySelector(targets[i]);
+                            if (t && t.scrollHeight > t.clientHeight) {
+                                t.scrollBy({ top: t.clientHeight, behavior: 'smooth' });
+                                console.log('[Fazm] scrolled fallback: ' + targets[i]);
+                                scrolled = true;
+                                break;
+                            }
                         }
-                    }
-                    if (!scrolled) {
-                        window.scrollBy({ top: window.innerHeight, behavior: 'smooth' });
-                        console.log('[Fazm] scrolled window as fallback');
+                        if (!scrolled) {
+                            window.scrollBy({ top: window.innerHeight, behavior: 'smooth' });
+                            console.log('[Fazm] scrolled window as last resort');
+                        }
                     }
                 }
 
