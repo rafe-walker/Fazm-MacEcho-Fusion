@@ -221,7 +221,7 @@ pub async fn list_live_releases(
                     "value": { "booleanValue": true }
                 }
             },
-            "limit": 20
+            "limit": 100
         }
     });
 
