@@ -127,6 +127,7 @@
     "Fixed Hindsight Memory not starting on clean Macs (missing OpenSSL for embedded PostgreSQL)",
     "Fixed typing indicator (bouncing dots) lingering after AI response completes",
     "Fixed PTT audio level bars not animating when conversation history is open",
-    "Smart TV now auto-advances to the next YouTube Short instead of replaying the same one"
+    "Smart TV now auto-advances to the next YouTube Short instead of replaying the same one",
+    "Hide TV button now properly resizes the window instead of just hiding the TV area"
   ]
 }
