@@ -157,31 +157,7 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
             .sink { listening in
                 guard ShortcutSettings.shared.smartTVEnabled else { return }
                 if listening {
-                    SmartTVController.shared.pauseVideo()
-                }
-            }
-            .store(in: &smartTVPauseCancellables)
-
-        // Pause Smart TV video when AI conversation input opens (user clicked input)
-        state.$showingAIConversation
-            .removeDuplicates()
-            .receive(on: DispatchQueue.main)
-            .sink { showing in
-                guard ShortcutSettings.shared.smartTVEnabled else { return }
-                if showing {
-                    SmartTVController.shared.pauseVideo()
-                }
-            }
-            .store(in: &smartTVPauseCancellables)
-
-        // Play Smart TV video when AI response starts streaming
-        state.$showingAIResponse
-            .removeDuplicates()
-            .receive(on: DispatchQueue.main)
-            .sink { showingResponse in
-                guard ShortcutSettings.shared.smartTVEnabled else { return }
-                if showingResponse {
-                    SmartTVController.shared.playVideo()
+                    SmartTVController.shared.pauseVideo(source: "ptt_start")
                 }
             }
             .store(in: &smartTVPauseCancellables)
