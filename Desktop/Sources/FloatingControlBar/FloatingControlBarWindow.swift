@@ -493,11 +493,12 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
         }
 
         resignKeyAnimationToken += 1
-        state.isCollapsed = true
-        preCollapseHeight = frame.height
-
-        // Collapse to half height (subtract SmartTV height first, then halve the chat portion)
+        // Save chat-only height (excluding SmartTV) for restore
         let tvHeight = smartTVExtraHeight
+        preCollapseHeight = frame.height - tvHeight
+
+        // Hide SmartTV before collapsing
+        state.smartTVVisible = false
         let chatHeight = frame.height - tvHeight
         let halfHeight = chatHeight / 2
         NSAnimationContext.runAnimationGroup({ ctx in
@@ -506,9 +507,13 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
             self.animator().alphaValue = 0.5
         })
         resizeAnchored(to: NSSize(width: frame.width, height: halfHeight), makeResizable: false, animated: true)
+        // Set isCollapsed AFTER resize to prevent SwiftUI content changes from
+        // triggering a top-left-anchored auto-resize before our bottom-anchored resize runs.
+        state.isCollapsed = true
     }
 
     /// Height of the window before it was collapsed (used to restore on focus).
+    /// This stores only the chat portion height (SmartTV height is excluded).
     private var preCollapseHeight: CGFloat = 0
 
     /// Expand back from collapsed state when the window regains focus.
@@ -528,7 +533,10 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
         }
 
         if preCollapseHeight > 0 {
-            resizeAnchored(to: NSSize(width: frame.width, height: preCollapseHeight), makeResizable: true, animated: true)
+            // Restore chat height + current SmartTV extra (TV may have been visible before collapse
+            // but is hidden now — smartTVExtraHeight reflects current visibility)
+            let restoreHeight = preCollapseHeight + smartTVExtraHeight
+            resizeAnchored(to: NSSize(width: frame.width, height: restoreHeight), makeResizable: true, animated: true)
         }
 
         makeKeyAndOrderFront(nil)
@@ -550,7 +558,7 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
 
     /// Extra height to add when Smart TV is showing, so the video sits above the chat.
     private var smartTVExtraHeight: CGFloat {
-        ShortcutSettings.shared.smartTVEnabled ? Self.smartTVHeight : 0
+        (ShortcutSettings.shared.smartTVEnabled && state.smartTVVisible) ? Self.smartTVHeight : 0
     }
 
     func showAIConversation() {
@@ -1734,8 +1742,11 @@ class FloatingControlBarManager {
 
         AnalyticsManager.shared.floatingBarQuerySent(messageLength: message.count, hasScreenshot: screenshotPath != nil, queryText: message)
 
-        // Smart TV: search YouTube Shorts for the user's query
+        // Smart TV: search YouTube Shorts for the user's query and show the TV
         if ShortcutSettings.shared.smartTVEnabled {
+            state.smartTVHiddenByUser = false
+            state.smartTVVisible = true
+            state.smartTVMuted = true  // always start muted on new query
             SmartTVController.shared.searchAndPlay(query: message)
         }
 
