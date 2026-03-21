@@ -606,7 +606,7 @@ struct ChatPrompts {
     static let excludedTablePrefixes = ["sqlite_", "grdb_"]
     /// Any table whose name contains "_fts" is an FTS virtual or internal table — exclude all.
     /// Specific infra tables also excluded.
-    static let excludedTables: Set<String> = []
+    static let excludedTables: Set<String> = ["local_kg_nodes", "local_kg_edges"]
 
     /// Infrastructure columns to strip from schema — file paths, binary blobs, sync state, internal flags.
     /// New migrations are still picked up automatically; only these specific names are hidden.
