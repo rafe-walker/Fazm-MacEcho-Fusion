@@ -125,6 +125,7 @@
     "Observer AI now uses dedicated tools instead of raw SQL, fixing card creation errors",
     "Browser profile now auto-extracts when queried for users who skipped the initial import",
     "Fixed Hindsight Memory not starting on clean Macs (missing OpenSSL for embedded PostgreSQL)",
-    "Fixed typing indicator (bouncing dots) lingering after AI response completes"
+    "Fixed typing indicator (bouncing dots) lingering after AI response completes",
+    "Fixed PTT audio level bars not animating when conversation history is open"
   ]
 }
