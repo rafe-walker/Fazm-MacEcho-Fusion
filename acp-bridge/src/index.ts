@@ -31,7 +31,7 @@ import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { createServer as createNetServer, type Socket } from "net";
 import { tmpdir } from "os";
-import { unlinkSync, appendFileSync, existsSync, watch, mkdirSync, copyFileSync, readdirSync } from "fs";
+import { unlinkSync, appendFileSync, existsSync, watch, mkdirSync, copyFileSync, readdirSync, writeFileSync, chmodSync } from "fs";
 import type {
   InboundMessage,
   OutboundMessage,
@@ -126,10 +126,10 @@ async function startHindsight(): Promise<boolean> {
   const pg0DataDir = join(home, ".pg0", "instances", "fazm");
   try { mkdirSync(pg0DataDir, { recursive: true }); } catch {}
 
-  // Copy bundled OpenSSL dylibs into pg0's lib directory so libpq can find them.
-  // DYLD_LIBRARY_PATH doesn't work because the Python binary is signed with
-  // hardened runtime (--options runtime), which causes macOS to strip DYLD_* vars.
-  // Instead, we place the dylibs where libpq already looks: alongside the pg0 postgres libs.
+  // Wrap pg0's postgres/initdb binaries so they find our bundled OpenSSL dylibs.
+  // The pg0 Rust binary strips DYLD_* env vars when spawning child processes,
+  // so we rename the real binaries and replace them with shell wrappers that
+  // set DYLD_LIBRARY_PATH before exec'ing the original.
   const frameworksDir = join(
     dirname(process.execPath), "..", "..", "Frameworks"
   );
@@ -137,20 +137,27 @@ async function startHindsight(): Promise<boolean> {
   try {
     if (existsSync(pg0Base)) {
       for (const ver of readdirSync(pg0Base)) {
-        const pg0Lib = join(pg0Base, ver, "lib");
-        if (!existsSync(pg0Lib)) continue;
-        for (const lib of ["libssl.3.dylib", "libcrypto.3.dylib"]) {
-          const src = join(frameworksDir, lib);
-          const dst = join(pg0Lib, lib);
-          if (existsSync(src) && !existsSync(dst)) {
-            copyFileSync(src, dst);
-            logErr(`Hindsight: copied ${lib} to pg0 lib dir`);
+        const pg0Bin = join(pg0Base, ver, "bin");
+        if (!existsSync(pg0Bin)) continue;
+        for (const bin of ["postgres", "initdb"]) {
+          const orig = join(pg0Bin, bin);
+          const real = join(pg0Bin, `${bin}.real`);
+          // Only wrap once (skip if already wrapped)
+          if (existsSync(real) || !existsSync(orig)) continue;
+          try {
+            copyFileSync(orig, real);
+            chmodSync(real, 0o755);
+            const wrapper = `#!/bin/bash\nexport DYLD_LIBRARY_PATH="${frameworksDir}:\${DYLD_LIBRARY_PATH:-}"\nexec "$(dirname "$0")/${bin}.real" "$@"\n`;
+            writeFileSync(orig, wrapper, { mode: 0o755 });
+            logErr(`Hindsight: wrapped ${bin} for OpenSSL dylib resolution`);
+          } catch (e) {
+            logErr(`Hindsight: failed to wrap ${bin}: ${e}`);
           }
         }
       }
     }
   } catch (e) {
-    logErr(`Hindsight: failed to copy OpenSSL dylibs to pg0: ${e}`);
+    logErr(`Hindsight: failed to set up pg0 wrappers: ${e}`);
   }
   const hindsightEnv: Record<string, string> = {
     PATH: process.env.PATH || "/usr/bin:/bin",
