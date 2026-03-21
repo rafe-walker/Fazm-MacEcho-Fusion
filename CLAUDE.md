@@ -53,6 +53,9 @@ When debugging issues for a specific user (crashes, errors, behavior), use the *
 ```
 See `.claude/skills/user-logs/SKILL.md` for full documentation and API queries.
 
+## Testing on a Clean Mac
+A MacStadium Mac mini (no Xcode, no Homebrew, no Node) is available for testing what real users experience. Use the `macstadium` skill when reproducing user-reported bugs, validating onboarding/first-run flows, or checking that a release works on a fresh machine. The `macos-use-remote` MCP provides GUI automation on it.
+
 ## Release Pipeline
 
 ### Desktop App (Codemagic)
