@@ -173,6 +173,11 @@ class ShortcutSettings: ObservableObject {
         didSet { UserDefaults.standard.set(draggableBarEnabled, forKey: "shortcut_draggableBarEnabled") }
     }
 
+    /// When true, YouTube Shorts plays above the floating bar. Off by default.
+    @Published var smartTVEnabled: Bool {
+        didSet { UserDefaults.standard.set(smartTVEnabled, forKey: "shortcut_smartTVEnabled") }
+    }
+
     /// How proactive the AI assistant should be.
     @Published var proactivenessLevel: ProactivenessLevel {
         didSet { UserDefaults.standard.set(proactivenessLevel.rawValue, forKey: "shortcut_proactivenessLevel") }
@@ -208,6 +213,7 @@ class ShortcutSettings: ObservableObject {
             self.pttTranscriptionMode = .batch
         }
         self.draggableBarEnabled = UserDefaults.standard.object(forKey: "shortcut_draggableBarEnabled") as? Bool ?? true
+        self.smartTVEnabled = UserDefaults.standard.object(forKey: "shortcut_smartTVEnabled") as? Bool ?? false
         if let saved = UserDefaults.standard.string(forKey: "shortcut_proactivenessLevel"),
            let level = ProactivenessLevel(rawValue: saved) {
             self.proactivenessLevel = level
