@@ -120,14 +120,14 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
 
         if ShortcutSettings.shared.draggableBarEnabled,
            let savedPosition = UserDefaults.standard.string(forKey: FloatingControlBarWindow.positionKey) {
-            let savedOrigin = NSPointFromString(savedPosition)
-            // Only restore the horizontal position from drag — vertical is always
-            // computed the same way as non-draggable mode (20pt above dock).
+            let savedCenter = NSPointFromString(savedPosition)
+            // Saved value is center X — convert back to origin for the pill width.
+            let pillWidth = FloatingControlBarWindow.minBarSize.width
             let targetScreen = NSScreen.main ?? NSScreen.screens.first
             let visibleFrame = targetScreen?.visibleFrame ?? .zero
             let defaultY = visibleFrame.minY + 20
-            let origin = NSPoint(x: savedOrigin.x, y: defaultY + FloatingControlBarWindow.collapsedYOffset)
-            // Verify saved X is on a visible screen
+            let origin = NSPoint(x: savedCenter.x - pillWidth / 2, y: defaultY + FloatingControlBarWindow.collapsedYOffset)
+            // Verify saved position is on a visible screen
             let onScreen = NSScreen.screens.contains { $0.visibleFrame.contains(NSPoint(x: origin.x + 14, y: origin.y + 14)) }
             if onScreen {
                 self.setFrameOrigin(origin)
@@ -914,14 +914,15 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
         let visibleFrame = screen.visibleFrame
         let y = visibleFrame.minY + 20
 
-        // Respect user's saved drag position when draggable bar is enabled
+        // Respect user's saved drag position when draggable bar is enabled.
+        // Saved value is center X — convert back to origin for the pill width.
         if ShortcutSettings.shared.draggableBarEnabled,
            let savedPosition = UserDefaults.standard.string(forKey: FloatingControlBarWindow.positionKey) {
-            let savedOrigin = NSPointFromString(savedPosition)
-            let savedCenterX = savedOrigin.x + size.width / 2
+            let savedCenter = NSPointFromString(savedPosition)
+            let savedCenterX = savedCenter.x
             // Only use saved X if it's on the target screen
             if savedCenterX >= visibleFrame.minX && savedCenterX <= visibleFrame.maxX {
-                return NSPoint(x: savedOrigin.x, y: y)
+                return NSPoint(x: savedCenterX - size.width / 2, y: y)
             }
         }
 
@@ -1028,8 +1029,12 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
         guard isUserDragging else { return }
         // Drag is horizontal-only — don't update canonicalBottomY from the drag.
         // Only save the horizontal position; vertical is always computed from screen geometry.
+        // Save the center X so the position is width-independent.
+        // The bar can be dragged while expanded (wide) or collapsed (pill),
+        // and restoring from center avoids drift when widths differ.
         UserDefaults.standard.set(
-            NSStringFromPoint(self.frame.origin), forKey: FloatingControlBarWindow.positionKey
+            NSStringFromPoint(NSPoint(x: self.frame.midX, y: self.frame.origin.y)),
+            forKey: FloatingControlBarWindow.positionKey
         )
     }
 
