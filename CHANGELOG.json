@@ -130,6 +130,7 @@
     "Smart TV now auto-advances to the next YouTube Short instead of replaying the same one",
     "Hide TV button now properly resizes the window instead of just hiding the TV area",
     "Fixed floating bar window jumping back to full height after manual resize",
-    "Fixed new chat still remembering previous conversation context"
+    "Fixed new chat still remembering previous conversation context",
+    "Fixed false \"Failed to get a response\" error when AI used tools without text output"
   ]
 }
