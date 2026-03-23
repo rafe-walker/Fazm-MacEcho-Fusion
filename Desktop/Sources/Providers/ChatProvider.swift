@@ -423,13 +423,13 @@ class ChatProvider: ObservableObject {
 
     /// Process rate limit events from the Claude API (forwarded via ACP bridge).
     /// Updates published state so the UI can show warnings or upgrade prompts.
-    func handleRateLimitEvent(status: String, resetsAt: Double?, rateLimitType: String?, utilization: Double?) {
+    func handleRateLimitEvent(status: String, resetsAt: Double?, rateLimitType limitType: String?, utilization: Double?) {
         rateLimitStatus = status
         rateLimitResetsAt = resetsAt
-        rateLimitType = rateLimitType
+        rateLimitType = limitType
         rateLimitUtilization = utilization
 
-        let typeLabel = Self.rateLimitTypeLabel(rateLimitType)
+        let typeLabel = Self.rateLimitTypeLabel(limitType)
 
         switch status {
         case "allowed_warning":
