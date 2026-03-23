@@ -1040,22 +1040,12 @@ private struct ScrollWheelDetector: NSViewRepresentable {
         }
 
         func install(for view: NSView) {
-            var scrollView: NSScrollView?
-            var current: NSView? = view
-            while let v = current {
-                if let sv = v as? NSScrollView {
-                    scrollView = sv
-                    break
-                }
-                current = v.superview
-            }
-            let targetScrollView = scrollView
+            let targetWindow = view.window
 
             monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
-                guard let self = self, let targetScrollView = targetScrollView else { return event }
-                guard event.window == targetScrollView.window else { return event }
-                let locationInScrollView = targetScrollView.convert(event.locationInWindow, from: nil)
-                guard targetScrollView.bounds.contains(locationInScrollView) else { return event }
+                guard let self = self else { return event }
+                // Scope to our window (the floating bar)
+                guard event.window == targetWindow else { return event }
                 // deltaY > 0 means scrolling up (towards earlier content)
                 if event.scrollingDeltaY > 0 {
                     self.onUserScrollUp()
