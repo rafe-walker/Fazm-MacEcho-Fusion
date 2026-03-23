@@ -526,6 +526,8 @@ struct ChatPrompts {
 
     {database_schema}
 
+    IMPORTANT: Only use table and column names from the schema above. Do NOT guess column names — if a column isn't listed, it doesn't exist.
+
     ## Tools
 
     1. **HINDSIGHT** (primary)
