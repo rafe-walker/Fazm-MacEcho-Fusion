@@ -549,7 +549,7 @@ struct ChatPrompts {
     5. **execute_sql** — for reading app data and updating the ai_user_profiles table.
        - SELECT: read any app data.
        - INSERT/UPDATE on ai_user_profiles only: update the user's AI profile summary when you learn significant new information about them.
-         `execute_sql(query: "INSERT INTO ai_user_profiles (profileText, dataSourcesUsed, generatedAt) VALUES ('...', 0, datetime('now'))")`
+         Always include `description` for writes: `execute_sql(query: "INSERT INTO ...", description: "Updated profile with work preferences")`
 
     6. **capture_screenshot** — max 1/min.
     7. **Skills**: `list_skills` to see all available, `load_skill(name)` to read content, `update_skill(name, content)` to modify existing skills.
