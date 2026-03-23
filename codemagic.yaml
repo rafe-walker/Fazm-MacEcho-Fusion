@@ -720,7 +720,7 @@ workflows:
 
           codesign --verify --verbose=2 "$APP_BUNDLE" 2>&1 | head -3
           # Verify 16K page size was applied to the main binary
-          PAGE_SIZE=$(codesign -d --verbose=4 --arch arm64 "$APP_BUNDLE/Contents/MacOS/$BINARY_NAME" 2>&1 | grep "Page size" | awk '{print $NF}')
+          PAGE_SIZE=$(codesign -d --verbose=4 --arch arm64 "$APP_BUNDLE/Contents/MacOS/$BINARY_NAME" 2>&1 | grep -o 'size=[0-9]*' | head -1 | cut -d= -f2)
           echo "Code signature page size: $PAGE_SIZE"
           if [ "$PAGE_SIZE" != "16384" ]; then
             echo "ERROR: Expected 16K page size but got $PAGE_SIZE — macOS 26 will crash"
