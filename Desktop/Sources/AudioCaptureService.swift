@@ -308,6 +308,7 @@ class AudioCaptureService: @unchecked Sendable {
         ioProcID = nil
         deviceID = kAudioObjectUnknown
         isReconfiguring = false
+        isStarting = false
         requestedDeviceUID = nil
         onAudioChunk = nil
         onAudioLevel = nil
@@ -643,8 +644,8 @@ class AudioCaptureService: @unchecked Sendable {
             }
         }
 
-        // Send to callback
-        onAudioChunk?(byteData)
+        // Send to callback (use captured local, not instance var)
+        chunkHandler(byteData)
     }
 
     // MARK: - Property Listeners
