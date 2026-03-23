@@ -162,6 +162,8 @@ class FloatingControlBarState: NSObject, ObservableObject {
 
     // Claude account connection prompt (shown when auth is needed or credits exhausted)
     @Published var showConnectClaudeButton: Bool = false
+    // Show "Upgrade" button when user hits personal Claude rate limit
+    @Published var showUpgradeClaudeButton: Bool = false
 
     // Tutorial chat guide state
     @Published var isTutorialChatActive: Bool = false
