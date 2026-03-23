@@ -85,9 +85,6 @@ struct AIResponseView: View {
                                     if atBottom != isAtBottom {
                                         DispatchQueue.main.async {
                                             isAtBottom = atBottom
-                                            if atBottom {
-                                                userHasScrolledUp = false
-                                            }
                                         }
                                     }
                                     return Color.clear
@@ -96,23 +93,15 @@ struct AIResponseView: View {
                     }
                 }
                 .coordinateSpace(name: "chatScroll")
-                .simultaneousGesture(
-                    DragGesture(minimumDistance: 1)
-                        .onChanged { _ in
-                            if !isAtBottom {
-                                userHasScrolledUp = true
-                            }
-                        }
-                )
                 .onChange(of: currentMessage?.text) {
-                    if !userHasScrolledUp {
+                    if isAtBottom {
                         withAnimation(.easeOut(duration: 0.15)) {
                             proxy.scrollTo("bottom", anchor: .bottom)
                         }
                     }
                 }
                 .onChange(of: currentMessage?.contentBlocks.count) {
-                    if !userHasScrolledUp {
+                    if isAtBottom {
                         withAnimation(.easeOut(duration: 0.15)) {
                             proxy.scrollTo("bottom", anchor: .bottom)
                         }
@@ -127,7 +116,7 @@ struct AIResponseView: View {
                 }
                 .onChange(of: state.pendingObserverExchanges.count) {
                     // Observer card arrived — scroll to show it
-                    if !userHasScrolledUp {
+                    if isAtBottom {
                         withAnimation(.easeOut(duration: 0.15)) {
                             proxy.scrollTo("bottom", anchor: .bottom)
                         }
