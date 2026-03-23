@@ -1,4 +1,7 @@
 import SwiftUI
+import os
+
+private let scrollLog = Logger(subsystem: "com.fazm.desktop-dev", category: "scroll")
 
 /// Streaming markdown response view for the floating control bar.
 struct AIResponseView: View {
@@ -82,7 +85,7 @@ struct AIResponseView: View {
                                     let scrollHeight = geo.frame(in: .named("chatScroll")).height
                                     // Consider "at bottom" if the anchor is within 60pt of the visible area bottom
                                     let atBottom = bottomY >= 0 && bottomY <= scrollHeight + 60
-                                    print("[SCROLL] bottomY=\(Int(bottomY)) scrollH=\(Int(scrollHeight)) atBottom=\(atBottom) userScrolled=\(userHasScrolledUp)")
+                                    scrollLog.notice("[SCROLL] bottomY=\(Int(bottomY)) scrollH=\(Int(scrollHeight)) atBottom=\(atBottom) userScrolled=\(self.userHasScrolledUp)")
                                     if atBottom != isAtBottom {
                                         DispatchQueue.main.async {
                                             isAtBottom = atBottom
@@ -99,10 +102,12 @@ struct AIResponseView: View {
                 .coordinateSpace(name: "chatScroll")
                 .background {
                     ScrollWheelDetector {
+                        scrollLog.notice("[SCROLL] wheel detected UP — setting userHasScrolledUp=true")
                         userHasScrolledUp = true
                     }
                 }
                 .onChange(of: currentMessage?.text) {
+                    scrollLog.notice("[SCROLL] text changed — userScrolled=\(self.userHasScrolledUp) isAtBottom=\(self.isAtBottom)")
                     if !userHasScrolledUp {
                         withAnimation(.easeOut(duration: 0.15)) {
                             proxy.scrollTo("bottom", anchor: .bottom)
