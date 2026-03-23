@@ -8,6 +8,7 @@ struct AIResponseView: View {
     @State private var isQuestionExpanded = false
     @State private var followUpText: String = ""
     @State private var preVoiceFollowUpText: String = ""
+    @State private var userHasScrolledUp: Bool = false
     @State private var isAtBottom: Bool = true
     @State private var followUpTextHeight: CGFloat = 36
     @State private var isHanging = false
@@ -84,6 +85,9 @@ struct AIResponseView: View {
                                     if atBottom != isAtBottom {
                                         DispatchQueue.main.async {
                                             isAtBottom = atBottom
+                                            if atBottom {
+                                                userHasScrolledUp = false
+                                            }
                                         }
                                     }
                                     return Color.clear
@@ -92,15 +96,20 @@ struct AIResponseView: View {
                     }
                 }
                 .coordinateSpace(name: "chatScroll")
+                .overlay {
+                    ScrollWheelInterceptor {
+                        userHasScrolledUp = true
+                    }
+                }
                 .onChange(of: currentMessage?.text) {
-                    if isAtBottom {
+                    if !userHasScrolledUp {
                         withAnimation(.easeOut(duration: 0.15)) {
                             proxy.scrollTo("bottom", anchor: .bottom)
                         }
                     }
                 }
                 .onChange(of: currentMessage?.contentBlocks.count) {
-                    if isAtBottom {
+                    if !userHasScrolledUp {
                         withAnimation(.easeOut(duration: 0.15)) {
                             proxy.scrollTo("bottom", anchor: .bottom)
                         }
@@ -114,7 +123,7 @@ struct AIResponseView: View {
                 }
                 .onChange(of: state.pendingObserverExchanges.count) {
                     // Observer card arrived — scroll to show it
-                    if isAtBottom {
+                    if !userHasScrolledUp {
                         withAnimation(.easeOut(duration: 0.15)) {
                             proxy.scrollTo("bottom", anchor: .bottom)
                         }
