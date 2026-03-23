@@ -8,7 +8,6 @@ struct AIResponseView: View {
     @State private var isQuestionExpanded = false
     @State private var followUpText: String = ""
     @State private var preVoiceFollowUpText: String = ""
-    @State private var userHasScrolledUp: Bool = false
     @State private var isAtBottom: Bool = true
     @State private var followUpTextHeight: CGFloat = 36
     @State private var isHanging = false
@@ -108,8 +107,7 @@ struct AIResponseView: View {
                     }
                 }
                 .onChange(of: chatHistory.count) {
-                    // New exchange added — always scroll to bottom and reset
-                    userHasScrolledUp = false
+                    // New exchange added — always scroll to bottom
                     withAnimation(.easeOut(duration: 0.15)) {
                         proxy.scrollTo("bottom", anchor: .bottom)
                     }
@@ -133,7 +131,6 @@ struct AIResponseView: View {
                 }
                 .onChange(of: isVoiceFollowUp) {
                     if isVoiceFollowUp {
-                        userHasScrolledUp = false
                         withAnimation(.easeOut(duration: 0.15)) {
                             proxy.scrollTo("voiceFollowUp", anchor: .bottom)
                         }
@@ -185,7 +182,6 @@ struct AIResponseView: View {
         }
         .onChange(of: isLoading) {
             if isLoading {
-                userHasScrolledUp = false
                 hangTask?.cancel()
                 hangTask = Task { [onStopAgent] in
                     // If no streaming data arrives within 60s, the query is failing silently
@@ -813,7 +809,6 @@ struct AIResponseView: View {
             // Agent is busy — queue the message instead of interrupting
             onEnqueueMessage?(trimmed)
         } else {
-            userHasScrolledUp = false
             onSendFollowUp?(trimmed)
         }
     }
