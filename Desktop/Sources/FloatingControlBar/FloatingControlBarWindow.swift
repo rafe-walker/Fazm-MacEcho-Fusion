@@ -1133,16 +1133,17 @@ class FloatingControlBarManager {
                     url = capturedURL
                 case .permissionDenied:
                     url = nil
+                    let weakSelf = self
                     await MainActor.run {
-                        self?.flagScreenRecordingPermissionLost()
+                        weakSelf?.flagScreenRecordingPermissionLost()
                     }
                 }
             } else {
                 url = ScreenCaptureManager.captureScreen()
             }
-            let capturedSelf = self
+            let weakSelf = self
             await MainActor.run {
-                capturedSelf?.pendingScreenshotPath = url
+                weakSelf?.pendingScreenshotPath = url
             }
         }
     }
