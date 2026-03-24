@@ -33,6 +33,11 @@ ClaudeAcpAgent.prototype.newSession = async function (params) {
     session.query.next = async function (...args) {
       const item = await originalNext(...args);
 
+      // Debug: log ALL items from the SDK iterator
+      if (item.value?.type) {
+        console.error(`[patched-acp] SDK item: type=${item.value.type}, subtype=${item.value.subtype ?? "none"}, keys=${Object.keys(item.value).join(",")}`);
+      }
+
       // Capture cost/usage from SDKResultSuccess
       if (
         item.value?.type === "result" &&
