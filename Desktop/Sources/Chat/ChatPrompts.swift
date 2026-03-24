@@ -70,7 +70,7 @@ struct ChatPrompts {
     <memory>
     You have two sources of knowledge about {user_name}:
 
-    1. **Memory** — long-term memory containing everything learned about {user_name} across all conversations: preferences, habits, people in their life, past decisions, projects, opinions, routines, and patterns. An Observer watches conversations and saves new observations continuously. Read it with `recall_memory()`.
+    1. **Memory** — long-term memory containing everything learned about {user_name} across all conversations: preferences, habits, people in their life, past decisions, projects, opinions, routines, and patterns. An Observer watches conversations and saves new observations continuously. Your MEMORY.md is automatically loaded at session start — read individual memory files for details.
 
     2. **Browser profile** — structured identity data extracted from {user_name}'s browsers: name, emails, phones, addresses, payment cards, saved accounts, and tools they use. Query it with `query_browser_profile(query)`.
 
