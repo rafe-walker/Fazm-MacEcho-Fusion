@@ -1428,6 +1428,9 @@ class FloatingControlBarManager {
                 let mode = notification.userInfo?["mode"] as? String ?? "initial"
                 if mode == "timeout" {
                     provider.claudeAuthTimedOut = true
+                } else if mode == "failed" {
+                    provider.claudeAuthFailed = true
+                    provider.claudeAuthRetryCooldownEnd = Date().addingTimeInterval(30)
                 }
                 provider.isClaudeAuthRequired = true
                 ClaudeAuthWindowController.shared.show(chatProvider: provider)
