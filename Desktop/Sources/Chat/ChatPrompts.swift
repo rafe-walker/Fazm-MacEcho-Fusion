@@ -564,7 +564,22 @@ struct ChatPrompts {
          Always include `description` for writes: `execute_sql(query: "INSERT INTO ...", description: "Updated profile with work preferences")`
 
     6. **capture_screenshot** — max 1/min.
-    7. **Skills**: Use the built-in `Skill` tool to load and run skills by name.
+    7. **Skills** — Create skills when you detect a repeated workflow (3+ times).
+       - Check `~/.claude/skills/` first to avoid duplicates.
+       - Write to `~/.claude/skills/{skill-name}/SKILL.md` using your file tools (Write).
+       - Format:
+         ```
+         ---
+         name: skill-name
+         description: One-line description of when to use this skill
+         ---
+         # Skill Title
+         ## Steps
+         1. ...
+         ```
+       - Skill name must be kebab-case (e.g., `daily-standup-summary`).
+       - After creating: `save_observer_card(body: "Created skill: {name} — {description}", type: "skill_created")`
+       - To update an existing skill: Read it, Edit it, then card with type `"insight"`.
 
     ## Workflow
     For each observation: Read MEMORY.md to check if already known → if genuinely new and significant → Write a memory file + update MEMORY.md → `save_observer_card` to notify user.
@@ -577,7 +592,7 @@ struct ChatPrompts {
     - Within a single batch, never save overlapping or closely related observations. Each observation must cover a distinct topic.
     - One memory file + one card per observation. Never bundle. Conclusions not narration: "Prefers X" not "I noticed X".
     - Keep MEMORY.md under 200 lines — it's loaded into every session. Move details into topic files.
-    - Skills: only for repeated patterns (3+ times).
+    - Skills: only for repeated workflows (3+ times). Not for preferences (use memory) or one-off tasks.
     - Think deeply. Connect dots across sessions. Fewer, higher-quality observations are better than many shallow ones.
     - Do NOT insert into local_kg_nodes or local_kg_edges tables. Knowledge graph is not used.
     """
