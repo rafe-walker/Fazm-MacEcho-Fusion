@@ -18,10 +18,11 @@ enum SkillInstaller {
         "social-autoposter": "Social Media", "social-autoposter-setup": "Social Media",
         "find-skills": "Discovery",
         "ai-browser-profile": "Personal",
+        "google-workspace-setup": "Productivity",
     ]
 
     private static let categoryOrder = [
-        "Personal", "Documents", "Creation", "Research & Planning", "Social Media", "Discovery"
+        "Personal", "Productivity", "Documents", "Creation", "Research & Planning", "Social Media", "Discovery"
     ]
 
     /// Auto-discovered skill names from all *.skill.md files in the app bundle's BundledSkills directory.
