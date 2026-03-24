@@ -1820,6 +1820,15 @@ class ChatProvider: ObservableObject {
         acpBridgeStarted = false
     }
 
+    /// Stop the ACP bridge so it picks up the new voice response setting on next start.
+    func restartBridgeForVoiceResponse() async {
+        guard acpBridgeStarted else { return }
+        let enabled = voiceResponseEnabled
+        log("ChatProvider: Stopping bridge to apply voice response change (enabled=\(enabled), will restart on next query)")
+        await acpBridge.stop()
+        acpBridgeStarted = false
+    }
+
     /// Enqueue a message to be sent after the current query finishes.
     /// Does NOT interrupt the current query — it will be picked up automatically.
     func enqueueMessage(_ text: String) {
