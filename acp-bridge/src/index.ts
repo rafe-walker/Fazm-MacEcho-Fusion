@@ -229,14 +229,23 @@ async function startHindsight(): Promise<boolean> {
     try { appendFileSync(hindsightLogPath, `[${new Date().toISOString()}] ${msg}\n`); } catch {}
   });
 
-  hindsightProcess.on("exit", (code) => {
-    logErr(`Hindsight: process exited with code ${code}`);
+  let processExited = false;
+  let exitCode: number | null = null;
+  hindsightProcess.on("exit", (code, signal) => {
+    logErr(`Hindsight: process exited with code ${code}, signal ${signal}`);
+    processExited = true;
+    exitCode = code;
     hindsightProcess = null;
   });
 
   // Wait for health check (up to 90s — first launch loads models + initializes Postgres)
   for (let i = 0; i < 180; i++) {
     await new Promise(r => setTimeout(r, 500));
+    // Stop polling early if the process already died
+    if (processExited) {
+      logErr(`Hindsight: process died during startup (code=${exitCode}), aborting health check`);
+      return false;
+    }
     try {
       const res = await fetch(`http://127.0.0.1:${HINDSIGHT_PORT}/health`);
       if (res.ok) {
@@ -1317,6 +1326,9 @@ async function handleQuery(msg: QueryMessage): Promise<void> {
       };
 
       logErr(`Prompt completed: stopReason=${promptResult.stopReason}`);
+      logErr(`[DEBUG] promptResult keys: ${Object.keys(promptResult).join(", ")}`);
+      logErr(`[DEBUG] promptResult.usage: ${JSON.stringify(promptResult.usage)}`);
+      logErr(`[DEBUG] promptResult._meta: ${JSON.stringify((promptResult as any)._meta)}`);
 
       // Increment image turn counter so we know when to stop including screenshots.
       // Image turn counting removed — screenshots are now read by the model via Read tool
