@@ -140,6 +140,8 @@
     "Fixed UI freezes during AI response streaming",
     "Fixed crash on macOS 26 (Tahoe) caused by 4K code signing page hashes \u2014 now uses 16K pages required by Apple Silicon on macOS 26",
     "Fixed crash caused by leaked Swift task continuation in ACP bridge",
-    "Added automatic rollback when an update crashes on launch \u2014 restores the previous version and blocks the bad update"
+    "Added automatic rollback when an update crashes on launch \u2014 restores the previous version and blocks the bad update",
+    "Added Voice Response setting \u2014 AI can speak its answers aloud using text-to-speech (Deepgram Luna voice)",
+    "Knowledge graph data from onboarding is now also saved to Hindsight for long-term memory recall"
   ]
 }
