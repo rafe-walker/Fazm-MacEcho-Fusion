@@ -132,18 +132,17 @@ Multiple agents work on this codebase simultaneously. `run.sh` handles locking a
 
 ### Monitoring `run.sh`
 
-After launching `run.sh`, monitor the dev log (`/private/tmp/fazm-dev.log`) to confirm progress:
+`run.sh` has a built-in watchdog that auto-releases the lock and exits if:
+- The app process dies (checked every 10s)
+- The dev log (`/private/tmp/fazm-dev.log`) hasn't been updated for 60 seconds
 
-```bash
-# Check that run.sh is producing output — if no new logs for 60s, it's stalled
-tail -1 /private/tmp/fazm-dev.log  # should show recent activity
-```
+During the **build phase** (before app launch), `run.sh` writes a startup line to the dev log immediately. You can monitor build progress via the `run.sh` stdout or `tail -f /private/tmp/fazm-dev.log`.
 
-If no new log lines appear for **60 seconds**, `run.sh` is stalled. Kill it and retry:
+If `run.sh` itself is stalled (e.g., `swift-build` at 0% CPU), kill and retry:
 ```bash
 rm -rf /tmp/fazm-build.lock
 pkill -f "run\.sh"; pkill -f "swift-build"
-# Then run ./run.sh again
+./run.sh
 ```
 
 ### After Implementing Changes
