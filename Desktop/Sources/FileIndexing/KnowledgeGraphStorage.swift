@@ -95,6 +95,22 @@ actor KnowledgeGraphStorage {
         log("KnowledgeGraphStorage: Merged \(nodes.count) nodes, \(edges.count) edges")
     }
 
+    /// Load raw node and edge records (for Hindsight migration)
+    func loadRawRecords() async -> (nodes: [LocalKGNodeRecord], edges: [LocalKGEdgeRecord]) {
+        guard let db = try? await ensureDB() else { return ([], []) }
+
+        do {
+            return try await db.read { database in
+                let nodes = try LocalKGNodeRecord.fetchAll(database)
+                let edges = try LocalKGEdgeRecord.fetchAll(database)
+                return (nodes, edges)
+            }
+        } catch {
+            logError("KnowledgeGraphStorage: Failed to load raw records", error: error)
+            return ([], [])
+        }
+    }
+
     /// Check if the local graph has any data
     func isEmpty() async -> Bool {
         guard let db = try? await ensureDB() else { return true }
