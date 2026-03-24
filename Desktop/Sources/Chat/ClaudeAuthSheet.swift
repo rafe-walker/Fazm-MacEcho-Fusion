@@ -7,10 +7,16 @@ struct ClaudeAuthSheet: View {
     let onConnect: () -> Void
     let onCancel: () -> Void
     let hasTimedOut: Bool
+    let hasFailed: Bool
+    let retryCooldownEnd: Date?
     let onRetry: () -> Void
 
     @State private var isConnecting = false
     @State private var showRetryOption = false
+    @State private var cooldownRemaining: Int = 0
+    @State private var cooldownTimer: Timer?
+
+    private var isCoolingDown: Bool { cooldownRemaining > 0 }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -42,14 +48,25 @@ struct ClaudeAuthSheet: View {
             // Content
             VStack(spacing: 20) {
                 // Icon
-                Image(systemName: hasTimedOut ? "exclamationmark.triangle" : "person.badge.key")
+                Image(systemName: errorIcon)
                     .scaledFont(size: 40)
-                    .foregroundColor(hasTimedOut ? .orange : FazmColors.textSecondary)
+                    .foregroundColor(errorIconColor)
                     .padding(.top, 8)
 
                 // Description
                 VStack(spacing: 8) {
-                    if hasTimedOut {
+                    if hasFailed {
+                        Text("Connection was rejected")
+                            .scaledFont(size: 15, weight: .medium)
+                            .foregroundColor(FazmColors.textPrimary)
+                            .multilineTextAlignment(.center)
+
+                        Text("Claude's server rejected the connection. Make sure you have an active Claude Pro or Max subscription, then try again.")
+                            .scaledFont(size: 13)
+                            .foregroundColor(FazmColors.textTertiary)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else if hasTimedOut {
                         Text("Sign-in didn't complete")
                             .scaledFont(size: 15, weight: .medium)
                             .foregroundColor(FazmColors.textPrimary)
@@ -75,7 +92,7 @@ struct ClaudeAuthSheet: View {
                 }
                 .padding(.horizontal, 20)
 
-                if isConnecting && !hasTimedOut {
+                if isConnecting && !hasTimedOut && !hasFailed {
                     VStack(spacing: 12) {
                         ProgressView()
                             .controlSize(.small)
@@ -94,7 +111,23 @@ struct ClaudeAuthSheet: View {
 
             // Actions
             VStack(spacing: 12) {
-                if hasTimedOut {
+                if hasFailed {
+                    Button(action: {
+                        isConnecting = false
+                        showRetryOption = false
+                        onRetry()
+                    }) {
+                        Text(isCoolingDown ? "Try Again (\(cooldownRemaining)s)" : "Try Again")
+                            .scaledFont(size: 14, weight: .semibold)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(isCoolingDown ? FazmColors.backgroundTertiary : Color.accentColor)
+                            .foregroundColor(isCoolingDown ? FazmColors.textTertiary : .white)
+                            .cornerRadius(8)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isCoolingDown)
+                } else if hasTimedOut {
                     Button(action: {
                         isConnecting = false
                         showRetryOption = false
@@ -141,7 +174,7 @@ struct ClaudeAuthSheet: View {
                         onConnect()
                         // After 10 seconds, show retry options so user isn't stuck
                         DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
-                            if isConnecting && !hasTimedOut {
+                            if isConnecting && !hasTimedOut && !hasFailed {
                                 withAnimation(.easeIn(duration: 0.2)) {
                                     showRetryOption = true
                                 }
@@ -176,12 +209,65 @@ struct ClaudeAuthSheet: View {
             .padding(.horizontal, 24)
             .padding(.bottom, 20)
         }
-        .frame(width: 400, height: (isConnecting && showRetryOption && !hasTimedOut) ? 430 : 380)
+        .frame(width: 400, height: sheetHeight)
         .background(FazmColors.backgroundPrimary)
         .onChange(of: hasTimedOut) {
             if hasTimedOut {
                 isConnecting = false
                 showRetryOption = false
+            }
+        }
+        .onChange(of: hasFailed) {
+            if hasFailed {
+                isConnecting = false
+                showRetryOption = false
+                startCooldownTimer()
+            }
+        }
+        .onDisappear {
+            cooldownTimer?.invalidate()
+            cooldownTimer = nil
+        }
+    }
+
+    private var sheetHeight: CGFloat {
+        if hasFailed { return 400 }
+        if isConnecting && showRetryOption && !hasTimedOut { return 430 }
+        return 380
+    }
+
+    private var errorIcon: String {
+        if hasFailed { return "xmark.shield" }
+        if hasTimedOut { return "exclamationmark.triangle" }
+        return "person.badge.key"
+    }
+
+    private var errorIconColor: Color {
+        if hasFailed { return .red }
+        if hasTimedOut { return .orange }
+        return FazmColors.textSecondary
+    }
+
+    private func startCooldownTimer() {
+        cooldownTimer?.invalidate()
+        guard let end = retryCooldownEnd else {
+            cooldownRemaining = 0
+            return
+        }
+        let remaining = Int(ceil(end.timeIntervalSinceNow))
+        guard remaining > 0 else {
+            cooldownRemaining = 0
+            return
+        }
+        cooldownRemaining = remaining
+        cooldownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
+            let r = Int(ceil(end.timeIntervalSinceNow))
+            if r <= 0 {
+                cooldownRemaining = 0
+                timer.invalidate()
+                cooldownTimer = nil
+            } else {
+                cooldownRemaining = r
             }
         }
     }
@@ -204,6 +290,8 @@ private struct ClaudeAuthWindowContent: View {
                 onDismiss()
             },
             hasTimedOut: chatProvider.claudeAuthTimedOut,
+            hasFailed: chatProvider.claudeAuthFailed,
+            retryCooldownEnd: chatProvider.claudeAuthRetryCooldownEnd,
             onRetry: {
                 chatProvider.retryClaudeAuth()
                 onDismiss()
