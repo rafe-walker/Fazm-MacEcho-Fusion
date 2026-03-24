@@ -26,6 +26,21 @@ export default function Chat({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Auto-resize textarea
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [input]);
+
+  // Focus input after response completes (desktop only)
+  useEffect(() => {
+    if (!isSending && isDesktopOnline && window.matchMedia("(min-width: 768px)").matches) {
+      inputRef.current?.focus();
+    }
+  }, [isSending, isDesktopOnline]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = input.trim();
@@ -46,7 +61,7 @@ export default function Chat({
     <div className="flex flex-col h-full">
       {/* Status bar */}
       {!isDesktopOnline && (
-        <div className="px-4 py-2 text-center text-sm bg-yellow-900/50 text-yellow-200 border-b border-yellow-800/50">
+        <div className="px-4 py-2 text-center text-xs bg-neutral-900 text-neutral-400 border-b border-neutral-800">
           {isConnected
             ? "Desktop is offline — open Fazm on your computer"
             : "Connecting..."}
@@ -54,9 +69,9 @@ export default function Chat({
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto hide-scrollbar px-4 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto hide-scrollbar px-4 py-4 space-y-3">
         {messages.length === 0 && isDesktopOnline && (
-          <div className="text-center text-[var(--muted)] mt-20">
+          <div className="text-center text-neutral-500 mt-20 text-sm">
             Send a message to your desktop AI
           </div>
         )}
@@ -67,10 +82,10 @@ export default function Chat({
             className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed ${
+              className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
                 msg.sender === "user"
-                  ? "bg-[var(--accent)] text-white"
-                  : "bg-[var(--border)] text-[var(--fg)]"
+                  ? "bg-white text-black rounded-br-md"
+                  : "bg-neutral-800 text-white rounded-bl-md"
               }`}
             >
               {/* Tool activities */}
@@ -79,7 +94,7 @@ export default function Chat({
                   {msg.toolActivities.map((tool, i) => (
                     <div
                       key={i}
-                      className="text-xs text-[var(--muted)] flex items-center gap-1.5"
+                      className="text-xs text-neutral-400 flex items-center gap-1.5"
                     >
                       <span
                         className={`inline-block w-1.5 h-1.5 rounded-full ${
@@ -97,46 +112,57 @@ export default function Chat({
               {/* Message text */}
               <div className="whitespace-pre-wrap break-words">
                 {msg.text}
-                {msg.isStreaming && !msg.text && (
-                  <span className="inline-block w-2 h-4 bg-[var(--muted)] animate-pulse rounded-sm" />
-                )}
-                {msg.isStreaming && msg.text && (
-                  <span className="inline-block w-1.5 h-4 bg-[var(--muted)] animate-pulse rounded-sm ml-0.5" />
+                {msg.isStreaming && (
+                  <span className="inline-flex gap-1 ml-1">
+                    <span className="animate-bounce" style={{ animationDelay: "0ms" }}>.</span>
+                    <span className="animate-bounce" style={{ animationDelay: "150ms" }}>.</span>
+                    <span className="animate-bounce" style={{ animationDelay: "300ms" }}>.</span>
+                  </span>
                 )}
               </div>
             </div>
           </div>
         ))}
 
+        {/* Loading indicator */}
+        {isSending && !messages.some((m) => m.isStreaming) && (
+          <div className="flex justify-start">
+            <div className="bg-neutral-800 text-white/80 rounded-2xl rounded-bl-md px-4 py-2.5 text-sm">
+              <span className="inline-flex gap-1">
+                <span className="animate-bounce" style={{ animationDelay: "0ms" }}>.</span>
+                <span className="animate-bounce" style={{ animationDelay: "150ms" }}>.</span>
+                <span className="animate-bounce" style={{ animationDelay: "300ms" }}>.</span>
+              </span>
+            </div>
+          </div>
+        )}
+
         <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}
-      <form
-        onSubmit={handleSubmit}
-        className="border-t border-[var(--border)] p-3 flex gap-2 items-end"
-      >
-        <textarea
-          ref={inputRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={
-            isDesktopOnline ? "Message..." : "Desktop offline"
-          }
-          disabled={!isDesktopOnline}
-          rows={1}
-          className="flex-1 bg-[var(--border)] text-[var(--fg)] rounded-xl px-4 py-2.5 text-[15px] resize-none outline-none placeholder:text-[var(--muted)] disabled:opacity-40"
-          style={{ maxHeight: "120px" }}
-        />
-        <button
-          type="submit"
-          disabled={!input.trim() || isSending || !isDesktopOnline}
-          className="bg-[var(--accent)] text-white rounded-xl px-4 py-2.5 text-[15px] font-medium disabled:opacity-40 transition-opacity shrink-0"
-        >
-          {isSending ? "..." : "Send"}
-        </button>
-      </form>
+      <div className="px-4 py-3 border-t border-neutral-800">
+        <form onSubmit={handleSubmit} className="flex gap-2 items-end">
+          <textarea
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={isDesktopOnline ? "Message..." : "Desktop offline"}
+            disabled={!isDesktopOnline}
+            rows={1}
+            className="flex-1 bg-neutral-900 text-white rounded-2xl px-4 py-2.5 text-sm resize-none leading-5 outline-none border border-neutral-700 focus:border-neutral-600 placeholder:text-neutral-500 disabled:opacity-40 hide-scrollbar"
+            style={{ maxHeight: "calc(8 * 1.25rem + 1.25rem)", overflowY: "auto" }}
+          />
+          <button
+            type="submit"
+            disabled={!input.trim() || isSending || !isDesktopOnline}
+            className="bg-white text-black font-medium px-4 py-2.5 rounded-full hover:bg-neutral-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-sm shrink-0"
+          >
+            {isSending ? "..." : "Send"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
