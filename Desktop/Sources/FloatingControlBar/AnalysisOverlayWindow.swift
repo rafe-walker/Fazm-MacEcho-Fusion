@@ -23,7 +23,7 @@ class AnalysisOverlayWindow {
     var isShowing: Bool { window != nil }
 
     /// Show the analysis overlay positioned above the given bar window frame.
-    func show(below barFrame: NSRect, task: String, description: String? = nil, activityId: Int64) {
+    func show(below barFrame: NSRect, task: String, description: String? = nil, document: String? = nil, activityId: Int64) {
         // Only one overlay at a time
         guard !isShowing else {
             log("AnalysisOverlay: already showing, skipping")
@@ -43,7 +43,7 @@ class AnalysisOverlayWindow {
                     }
 
                     // Inject message into existing floating bar session
-                    AnalysisOverlayWindow.sendDiscussMessage(task: task, description: description)
+                    AnalysisOverlayWindow.sendDiscussMessage(task: task, description: description, document: document)
                 },
                 onHide: { [weak self] in
                     log("AnalysisOverlay: Hide tapped (activityId=\(activityId))")
@@ -106,7 +106,7 @@ class AnalysisOverlayWindow {
     // MARK: - Discuss Action
 
     /// Send the analysis context as a user message into the existing floating bar session.
-    private static func sendDiscussMessage(task: String, description: String?) {
+    private static func sendDiscussMessage(task: String, description: String?, document: String?) {
         // Build the message that gets sent as if the user typed it
         var message = """
         The screen observer analyzed my last ~60 minutes of activity and identified a task that could be done by AI:
@@ -116,6 +116,10 @@ class AnalysisOverlayWindow {
 
         if let description, !description.isEmpty {
             message += "\n\n**What was observed:** \(description)"
+        }
+
+        if let document, !document.isEmpty {
+            message += "\n\n---\n\n\(document)"
         }
 
         message += """
