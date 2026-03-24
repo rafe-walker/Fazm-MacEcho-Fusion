@@ -1,14 +1,13 @@
 import Foundation
-import Network
 
-/// Runs a local WebSocket server and a Cloudflare tunnel so that a phone/web
-/// client can send chat queries to the desktop app remotely.
+/// Runs a local WebSocket server (via Node.js subprocess) and a Cloudflare tunnel
+/// so that a phone/web client can send chat queries to the desktop app remotely.
 ///
 /// Flow:
-/// 1. Start a NWListener on a random port
+/// 1. Launch a Node.js WS server (ws-relay.js) on a random port
 /// 2. Launch `cloudflared tunnel --url http://localhost:<port>` to expose it
 /// 3. Register the tunnel URL with the backend (`/api/relay/register`)
-/// 4. Accept WebSocket connections, validate Firebase token, relay messages
+/// 4. Relay messages between phone and ChatProvider via stdin/stdout pipes
 @MainActor
 final class WebRelay: ObservableObject {
 
@@ -17,9 +16,9 @@ final class WebRelay: ObservableObject {
     @Published private(set) var tunnelUrl: String?
     @Published private(set) var isPhoneConnected = false
 
-    private var listener: NWListener?
-    private var activeConnection: NWConnection?
+    private var wsServerProcess: Process?
     private var cloudflaredProcess: Process?
+    private var stdinPipe: Pipe?
     private var localPort: UInt16 = 0
 
     /// Callback: a query arrived from the phone. Parameters: text, sessionKey
@@ -31,116 +30,162 @@ final class WebRelay: ObservableObject {
     // MARK: - Lifecycle
 
     func start() {
-        startListener()
+        startWsServer()
     }
 
     func stop() {
         unregisterTunnel()
         cloudflaredProcess?.terminate()
         cloudflaredProcess = nil
-        listener?.cancel()
-        listener = nil
-        activeConnection?.cancel()
-        activeConnection = nil
+        wsServerProcess?.terminate()
+        wsServerProcess = nil
+        stdinPipe = nil
         tunnelUrl = nil
         isPhoneConnected = false
     }
 
-    // MARK: - Local WebSocket Server
+    // MARK: - Node.js WebSocket Server
 
-    private func startListener() {
-        let params = NWParameters.tcp
-        let wsOptions = NWProtocolWebSocket.Options()
-        params.defaultProtocolStack.applicationProtocols.insert(wsOptions, at: 0)
-
-        do {
-            // Port 0 = system picks a random available port
-            listener = try NWListener(using: params, on: .any)
-        } catch {
-            logError("WebRelay: failed to create listener", error: error)
+    private func startWsServer() {
+        // Find the Node binary and ws-relay.js script
+        let bundle = Bundle.main
+        guard let nodePath = findNode(in: bundle) else {
+            log("WebRelay: Node.js binary not found, skipping")
+            return
+        }
+        guard let scriptPath = findWsRelayScript(in: bundle) else {
+            log("WebRelay: ws-relay.js not found, skipping")
             return
         }
 
-        listener?.stateUpdateHandler = { [weak self] state in
-            Task { @MainActor in
-                switch state {
-                case .ready:
-                    if let port = self?.listener?.port?.rawValue {
-                        self?.localPort = port
-                        log("WebRelay: listening on port \(port)")
-                        self?.startCloudflared(port: port)
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: nodePath)
+        process.arguments = [scriptPath]
+
+        // Set NODE_PATH so ws module can be found
+        var env = ProcessInfo.processInfo.environment
+        if let bridgeDir = findAcpBridgeDir(in: bundle) {
+            env["NODE_PATH"] = bridgeDir + "/node_modules"
+        }
+        process.environment = env
+
+        let stdin = Pipe()
+        let stdout = Pipe()
+        let stderr = Pipe()
+        process.standardInput = stdin
+        process.standardOutput = stdout
+        process.standardError = stderr
+        stdinPipe = stdin
+
+        // Read stdout for PORT and MSG lines
+        stdout.fileHandleForReading.readabilityHandler = { [weak self] handle in
+            let data = handle.availableData
+            guard !data.isEmpty, let output = String(data: data, encoding: .utf8) else { return }
+
+            for line in output.components(separatedBy: "\n") where !line.isEmpty {
+                if line.hasPrefix("PORT:") {
+                    let portStr = String(line.dropFirst(5))
+                    if let port = UInt16(portStr) {
+                        Task { @MainActor in
+                            self?.localPort = port
+                            log("WebRelay: WS server listening on port \(port)")
+                            self?.startCloudflared(port: port)
+                        }
                     }
-                case .failed(let error):
-                    logError("WebRelay: listener failed", error: error)
-                default:
-                    break
+                } else if line.hasPrefix("MSG:") {
+                    let jsonStr = String(line.dropFirst(4))
+                    if let data = jsonStr.data(using: .utf8),
+                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let type = json["type"] as? String {
+                        Task { @MainActor in
+                            await self?.handleIncomingMessage(type: type, json: json)
+                        }
+                    }
                 }
             }
         }
 
-        listener?.newConnectionHandler = { [weak self] connection in
-            Task { @MainActor in
-                self?.handleNewConnection(connection)
-            }
-        }
+        // Read stderr for CLIENT_CONNECTED/DISCONNECTED
+        stderr.fileHandleForReading.readabilityHandler = { [weak self] handle in
+            let data = handle.availableData
+            guard !data.isEmpty, let output = String(data: data, encoding: .utf8) else { return }
 
-        listener?.start(queue: .main)
-    }
-
-    private func handleNewConnection(_ connection: NWConnection) {
-        // Only allow one connection at a time (latest wins)
-        activeConnection?.cancel()
-        activeConnection = connection
-        isPhoneConnected = true
-        log("WebRelay: phone connected")
-
-        connection.stateUpdateHandler = { [weak self] state in
-            if case .failed(_) = state {
-                Task { @MainActor in
-                    self?.connectionClosed(connection)
-                }
-            } else if case .cancelled = state {
-                Task { @MainActor in
-                    self?.connectionClosed(connection)
+            for line in output.components(separatedBy: "\n") where !line.isEmpty {
+                if line.contains("CLIENT_CONNECTED") {
+                    Task { @MainActor in
+                        self?.isPhoneConnected = true
+                        log("WebRelay: phone connected")
+                    }
+                } else if line.contains("CLIENT_DISCONNECTED") {
+                    Task { @MainActor in
+                        self?.isPhoneConnected = false
+                        log("WebRelay: phone disconnected")
+                    }
                 }
             }
         }
 
-        receiveMessage(on: connection)
-    }
-
-    private func connectionClosed(_ connection: NWConnection) {
-        if activeConnection === connection {
-            activeConnection = nil
-            isPhoneConnected = false
-            log("WebRelay: phone disconnected")
+        do {
+            try process.run()
+            wsServerProcess = process
+            log("WebRelay: WS server process started")
+        } catch {
+            logError("WebRelay: failed to start WS server", error: error)
         }
     }
 
-    private func receiveMessage(on connection: NWConnection) {
-        connection.receiveMessage { [weak self] content, context, isComplete, error in
-            guard let self else { return }
-            if let error {
-                log("WebRelay: receive error: \(error)")
-                return
-            }
+    // MARK: - Find bundled paths
 
-            if let data = content,
-               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let type = json["type"] as? String {
-                Task { @MainActor in
-                    await self.handleIncomingMessage(type: type, json: json)
-                }
-            }
+    private func findNode(in bundle: Bundle) -> String? {
+        // Check bundle first, then system
+        let bundlePaths = [
+            bundle.resourcePath.map { $0 + "/Fazm_Fazm.bundle/node" },
+            bundle.executablePath.map { URL(fileURLWithPath: $0).deletingLastPathComponent().path + "/node" },
+        ].compactMap { $0 }
 
-            // Keep receiving
-            if connection.state == .ready {
-                Task { @MainActor in
-                    self.receiveMessage(on: connection)
-                }
-            }
+        for path in bundlePaths {
+            if FileManager.default.fileExists(atPath: path) { return path }
         }
+
+        // Fallback to system node
+        let systemPaths = ["/opt/homebrew/bin/node", "/usr/local/bin/node"]
+        return systemPaths.first(where: { FileManager.default.fileExists(atPath: $0) })
     }
+
+    private func findWsRelayScript(in bundle: Bundle) -> String? {
+        let bundlePaths = [
+            bundle.resourcePath.map { $0 + "/acp-bridge/dist/ws-relay.js" },
+        ].compactMap { $0 }
+
+        for path in bundlePaths {
+            if FileManager.default.fileExists(atPath: path) { return path }
+        }
+
+        // Dev fallback: source tree
+        let devPath = ProcessInfo.processInfo.environment["FAZM_SOURCE_DIR"]
+            .map { $0 + "/acp-bridge/dist/ws-relay.js" }
+        if let devPath, FileManager.default.fileExists(atPath: devPath) { return devPath }
+
+        return nil
+    }
+
+    private func findAcpBridgeDir(in bundle: Bundle) -> String? {
+        let bundlePaths = [
+            bundle.resourcePath.map { $0 + "/acp-bridge" },
+        ].compactMap { $0 }
+
+        for path in bundlePaths {
+            if FileManager.default.fileExists(atPath: path) { return path }
+        }
+
+        let devPath = ProcessInfo.processInfo.environment["FAZM_SOURCE_DIR"]
+            .map { $0 + "/acp-bridge" }
+        if let devPath, FileManager.default.fileExists(atPath: devPath) { return devPath }
+
+        return nil
+    }
+
+    // MARK: - Message handling
 
     private func handleIncomingMessage(type: String, json: [String: Any]) async {
         switch type {
@@ -168,24 +213,17 @@ final class WebRelay: ObservableObject {
     // MARK: - Send to phone
 
     func sendToPhone(_ json: [String: Any]) {
-        guard let connection = activeConnection, connection.state == .ready else { return }
+        guard let stdinPipe else { return }
+        guard let data = try? JSONSerialization.data(withJSONObject: json),
+              let jsonStr = String(data: data, encoding: .utf8) else { return }
 
-        guard let data = try? JSONSerialization.data(withJSONObject: json) else { return }
-
-        let metadata = NWProtocolWebSocket.Metadata(opcode: .text)
-        let context = NWConnection.ContentContext(identifier: "ws", metadata: [metadata])
-
-        connection.send(content: data, contentContext: context, isComplete: true, completion: .contentProcessed { error in
-            if let error {
-                log("WebRelay: send error: \(error)")
-            }
-        })
+        let line = jsonStr + "\n"
+        stdinPipe.fileHandleForWriting.write(line.data(using: .utf8)!)
     }
 
     // MARK: - Cloudflared Tunnel
 
     private func startCloudflared(port: UInt16) {
-        // Look for cloudflared in common locations
         let paths = [
             "/opt/homebrew/bin/cloudflared",
             "/usr/local/bin/cloudflared",
@@ -202,14 +240,12 @@ final class WebRelay: ObservableObject {
         process.arguments = ["tunnel", "--url", "http://localhost:\(port)"]
 
         let pipe = Pipe()
-        process.standardError = pipe // cloudflared logs to stderr
+        process.standardError = pipe
 
         pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
             guard !data.isEmpty, let output = String(data: data, encoding: .utf8) else { return }
 
-            // Parse tunnel URL from cloudflared output
-            // It prints something like: "https://xxxxx.trycloudflare.com"
             if let range = output.range(of: "https://[a-z0-9-]+\\.trycloudflare\\.com", options: .regularExpression) {
                 let url = String(output[range])
                 Task { @MainActor in
