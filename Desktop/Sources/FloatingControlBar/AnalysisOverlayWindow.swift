@@ -1,4 +1,5 @@
 import Cocoa
+import GRDB
 import SwiftUI
 
 /// NSPanel subclass that can become key (required for buttons to work in a borderless floating panel).
@@ -82,9 +83,9 @@ class AnalysisOverlayWindow {
 
     /// Update observer_activity row status.
     private static func updateActivityStatus(activityId: Int64, status: String, response: String) async {
-        guard let dbQueue = AppDatabase.shared.getDatabaseQueue() else { return }
+        guard let dbQueue = await AppDatabase.shared.getDatabaseQueue() else { return }
         do {
-            try dbQueue.write { db in
+            try await dbQueue.write { db in
                 try db.execute(
                     sql: "UPDATE observer_activity SET status = ?, userResponse = ?, actedAt = datetime('now') WHERE id = ?",
                     arguments: [status, response, activityId]
