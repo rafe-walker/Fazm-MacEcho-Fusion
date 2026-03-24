@@ -493,7 +493,7 @@ class PushToTalkManager: ObservableObject {
         return
       }
 
-      barState?.voiceTranscript = "Transcribing..."
+      barState?.audioLevel.transcript = "Transcribing..."
 
       Task {
         do {
@@ -735,7 +735,7 @@ class PushToTalkManager: ObservableObject {
       let committed = transcriptSegments.joined(separator: " ")
       liveText = committed.isEmpty ? segment.text : committed + " " + segment.text
     }
-    barState?.voiceTranscript = liveText
+    barState?.audioLevel.transcript = liveText
 
     // Sync live transcript directly into the input field
     if pttOpenedChat {
