@@ -19,6 +19,7 @@ enum SkillInstaller {
         "find-skills": "Discovery",
         "ai-browser-profile": "Personal",
         "google-workspace-setup": "Productivity",
+        "telegram": "Productivity",
     ]
 
     private static let categoryOrder = [
