@@ -228,7 +228,7 @@ const ONBOARDING_TOOL_NAMES = new Set([
   "save_knowledge_graph",
 ]);
 
-// Observer session only gets these tools (SQL reads, screenshots, skills, browser profile, cards, memory)
+// Observer session only gets these tools (SQL reads, screenshots, skills, browser profile, cards)
 const OBSERVER_TOOL_NAMES = new Set([
   "execute_sql",
   "capture_screenshot",
@@ -237,8 +237,6 @@ const OBSERVER_TOOL_NAMES = new Set([
   "update_skill",
   "query_browser_profile",
   "save_observer_card",
-  "save_memory",
-  "recall_memory",
 ]);
 
 const ALL_TOOLS = [
@@ -485,29 +483,6 @@ Aim for 15-40 nodes with meaningful edges connecting them.`,
         type: { type: "string" as const, enum: ["insight", "pattern", "skill_created", "kg_update"], description: "Card type (default: insight)" },
       },
       required: ["body"],
-    },
-  },
-  {
-    name: "save_memory",
-    description: `Save an observation or fact to persistent memory. Appends a timestamped entry to a local markdown file. Use this to remember user preferences, patterns, facts, and important context across conversations. Always call recall_memory first to check for duplicates.`,
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        content: { type: "string" as const, description: "The fact, preference, or observation to save" },
-        category: { type: "string" as const, enum: ["preference", "pattern", "fact", "context"], description: "Category of the memory (default: fact)" },
-      },
-      required: ["content"],
-    },
-  },
-  {
-    name: "recall_memory",
-    description: `Read all saved memories from persistent storage. Returns the full memory file. Use this before saving new memories to check for duplicates and to load context at the start of conversations.`,
-    inputSchema: {
-      type: "object" as const,
-      properties: {
-        query: { type: "string" as const, description: "Optional keyword to search for (currently returns all memories)" },
-      },
-      required: [],
     },
   },
   {
@@ -892,57 +867,6 @@ async function handleJsonRpc(
             id,
             result: { content: [{ type: "text", text: "Card created." }] },
           });
-        }
-      } else if (toolName === "save_memory") {
-        // File-based memory — append timestamped entry to markdown file
-        const content = (args.content as string) || "";
-        const category = (args.category as string) || "fact";
-        const timestamp = new Date().toISOString();
-        try {
-          mkdirSync(memoryDir, { recursive: true });
-          const entry = `\n## ${timestamp} [${category}]\n\n${content}\n`;
-          appendFileSync(memoryFilePath, entry, "utf8");
-          logErr(`save_memory: saved ${content.length} bytes (${category})`);
-          if (!isNotification) {
-            send({
-              jsonrpc: "2.0",
-              id,
-              result: { content: [{ type: "text", text: `Memory saved (${category}): ${content.substring(0, 100)}${content.length > 100 ? "..." : ""}` }] },
-            });
-          }
-        } catch (err) {
-          logErr(`save_memory: failed: ${err}`);
-          if (!isNotification) {
-            sendErrorResponse(id, -32603, `Failed to save memory: ${err}`);
-          }
-        }
-      } else if (toolName === "recall_memory") {
-        // File-based memory — read full memory file
-        try {
-          if (!existsSync(memoryFilePath)) {
-            if (!isNotification) {
-              send({
-                jsonrpc: "2.0",
-                id,
-                result: { content: [{ type: "text", text: "No memories saved yet." }] },
-              });
-            }
-          } else {
-            const content = readFileSync(memoryFilePath, "utf8");
-            logErr(`recall_memory: returned ${content.length} bytes`);
-            if (!isNotification) {
-              send({
-                jsonrpc: "2.0",
-                id,
-                result: { content: [{ type: "text", text: content || "No memories saved yet." }] },
-              });
-            }
-          }
-        } catch (err) {
-          logErr(`recall_memory: failed: ${err}`);
-          if (!isNotification) {
-            sendErrorResponse(id, -32603, `Failed to read memory: ${err}`);
-          }
         }
       } else if (toolName === "speak_response") {
         // Voice response — forward to Swift for TTS playback
