@@ -2023,6 +2023,13 @@ class ChatProvider: ObservableObject {
         errorMessage = nil
         pendingRetryMessage = trimmedText
 
+        // Track user message sent
+        AnalyticsManager.shared.chatMessageSent(
+            messageLength: trimmedText.count,
+            hasContext: systemPromptSuffix != nil || systemPromptPrefix != nil,
+            source: sessionKey ?? "default"
+        )
+
         // Save user message to backend and add to UI.
         // (skip for follow-ups — sendFollowUp already did both)
         //
