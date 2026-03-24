@@ -25,7 +25,7 @@ export function useDesktopRelay(token: string | null): RelayHook {
   const [isSending, setIsSending] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const currentAiMessageId = useRef<string | null>(null);
-  const reconnectTimer = useRef<ReturnType<typeof setTimeout>>();
+  const reconnectTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "";
 
   // Discover tunnel URL and connect
