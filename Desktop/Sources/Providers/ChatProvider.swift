@@ -366,6 +366,11 @@ class ChatProvider: ObservableObject {
     /// Whether the ACP bridge requires authentication (shown as sheet in UI)
     @Published var isClaudeAuthRequired = false
     @Published var claudeAuthTimedOut = false
+    /// Whether the token exchange was rejected (e.g. 403 forbidden)
+    @Published var claudeAuthFailed = false
+    @Published var claudeAuthFailedReason: String?
+    /// Cooldown: earliest time the user can retry after a 403 failure
+    @Published var claudeAuthRetryCooldownEnd: Date?
     /// Auth methods returned by ACP bridge
     @Published var claudeAuthMethods: [[String: Any]] = []
     /// OAuth URL to open in browser (sent by bridge when auth is needed)
@@ -570,6 +575,14 @@ class ChatProvider: ObservableObject {
                     Task { @MainActor in
                         self?.claudeAuthTimedOut = true
                         log("ChatProvider: Auth timeout: \(reason)")
+                    }
+                },
+                onAuthFailed: { [weak self] reason, httpStatus in
+                    Task { @MainActor in
+                        log("ChatProvider: Auth failed (HTTP \(httpStatus ?? 0)): \(reason)")
+                        self?.claudeAuthFailed = true
+                        self?.claudeAuthFailedReason = reason
+                        self?.claudeAuthRetryCooldownEnd = Date().addingTimeInterval(30)
                     }
                 }
             )
@@ -849,6 +862,14 @@ class ChatProvider: ObservableObject {
                     Task { @MainActor [weak self] in
                         log("ChatProvider: Claude OAuth timed out: \(reason)")
                         self?.claudeAuthTimedOut = true
+                    }
+                },
+                onAuthFailed: { [weak self] reason, httpStatus in
+                    Task { @MainActor [weak self] in
+                        log("ChatProvider: Claude OAuth failed (HTTP \(httpStatus ?? 0)): \(reason)")
+                        self?.claudeAuthFailed = true
+                        self?.claudeAuthFailedReason = reason
+                        self?.claudeAuthRetryCooldownEnd = Date().addingTimeInterval(30)
                     }
                 }
             )
