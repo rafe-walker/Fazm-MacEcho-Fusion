@@ -1326,9 +1326,6 @@ async function handleQuery(msg: QueryMessage): Promise<void> {
       };
 
       logErr(`Prompt completed: stopReason=${promptResult.stopReason}`);
-      logErr(`[DEBUG] promptResult keys: ${Object.keys(promptResult).join(", ")}`);
-      logErr(`[DEBUG] promptResult.usage: ${JSON.stringify(promptResult.usage)}`);
-      logErr(`[DEBUG] promptResult._meta: ${JSON.stringify((promptResult as any)._meta)}`);
 
       // Increment image turn counter so we know when to stop including screenshots.
       // Image turn counting removed — screenshots are now read by the model via Read tool
