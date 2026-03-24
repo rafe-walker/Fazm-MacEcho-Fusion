@@ -1,4 +1,5 @@
 import Foundation
+import GRDB
 import PostHog
 import SessionReplay
 
@@ -157,6 +158,11 @@ actor GeminiAnalysisService {
                 properties["task"] = task
             }
             PostHogSDK.shared.capture("gemini_analysis_completed", properties: properties)
+
+            // Persist TASK_FOUND results to observer_activity and show overlay
+            if result.verdict == "TASK_FOUND", let task = result.task {
+                await persistAndShowOverlay(task: task, result: result)
+            }
 
             // Success — remove only the chunks we analyzed (new ones may have arrived during analysis)
             let analyzedURLs = Set(chunks.map { $0.localURL })
@@ -426,6 +432,47 @@ actor GeminiAnalysisService {
     private func cleanupChunkFiles(chunks: [ChunkEntry]) {
         for chunk in chunks {
             try? FileManager.default.removeItem(at: chunk.localURL)
+        }
+    }
+
+    // MARK: - Persistence & Overlay
+
+    /// Insert the analysis result into observer_activity and show the overlay above the floating bar.
+    private func persistAndShowOverlay(task: String, result: AnalysisResult) async {
+        // 1. Persist to observer_activity
+        var activityId: Int64 = 0
+        if let dbQueue = AppDatabase.shared.getDatabaseQueue() {
+            do {
+                let contentJson: [String: Any] = [
+                    "task": task,
+                    "chunks_analyzed": result.chunksAnalyzed,
+                    "raw": result.raw,
+                ]
+                let contentString = String(data: try JSONSerialization.data(withJSONObject: contentJson), encoding: .utf8) ?? task
+
+                activityId = try dbQueue.write { db -> Int64 in
+                    try db.execute(
+                        sql: """
+                            INSERT INTO observer_activity (type, content, status, createdAt)
+                            VALUES (?, ?, 'pending', datetime('now'))
+                        """,
+                        arguments: ["gemini_analysis", contentString]
+                    )
+                    return db.lastInsertedRowID
+                }
+                log("GeminiAnalysis: persisted to observer_activity id=\(activityId)")
+            } catch {
+                log("GeminiAnalysis: failed to persist to DB: \(error)")
+            }
+        }
+
+        // 2. Show overlay on main thread
+        await MainActor.run {
+            if let barFrame = FloatingControlBarManager.shared.barWindowFrame {
+                AnalysisOverlayWindow.shared.show(below: barFrame, task: task, activityId: activityId)
+            } else {
+                log("GeminiAnalysis: no bar frame available, skipping overlay")
+            }
         }
     }
 }
