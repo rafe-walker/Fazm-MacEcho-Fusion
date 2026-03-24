@@ -336,21 +336,12 @@ struct FloatingControlBarView: View {
                     .cornerRadius(4)
             }
 
-            if state.isVoiceFinalizing {
-                Text("Transcribing...")
-                    .scaledFont(size: 13)
-                    .foregroundColor(.white.opacity(0.8))
-            } else if !state.voiceTranscript.isEmpty {
-                Text(state.voiceTranscript)
-                    .scaledFont(size: 13)
-                    .foregroundColor(.white.opacity(0.8))
-                    .lineLimit(1)
-                    .truncationMode(.head)
-            } else {
-                Text(state.isVoiceLocked ? "Tap \(shortcutSettings.pttKey.symbol) to send" : "Release \(shortcutSettings.pttKey.symbol) to send")
-                    .scaledFont(size: 13)
-                    .foregroundColor(.white.opacity(0.5))
-            }
+            ObservedTranscriptView(
+                audioLevel: state.audioLevel,
+                isVoiceFinalizing: state.isVoiceFinalizing,
+                isVoiceLocked: state.isVoiceLocked,
+                pttKeySymbol: shortcutSettings.pttKey.symbol
+            )
         }
     }
 
