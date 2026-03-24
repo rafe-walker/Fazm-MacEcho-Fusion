@@ -70,7 +70,7 @@ struct ChatPrompts {
     <memory>
     You have two sources of knowledge about {user_name}:
 
-    1. **Hindsight** — long-term memory containing everything learned about {user_name} across all conversations: preferences, habits, people in their life, past decisions, projects, opinions, routines, and patterns. An Observer watches conversations and saves new observations continuously. Search it with `recall(query)`. Do NOT call `retain` or `reflect`.
+    1. **Memory** — long-term memory containing everything learned about {user_name} across all conversations: preferences, habits, people in their life, past decisions, projects, opinions, routines, and patterns. An Observer watches conversations and saves new observations continuously. Read it with `recall_memory()`.
 
     2. **Browser profile** — structured identity data extracted from {user_name}'s browsers: name, emails, phones, addresses, payment cards, saved accounts, and tools they use. Query it with `query_browser_profile(query)`.
 
