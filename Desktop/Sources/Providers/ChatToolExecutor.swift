@@ -27,13 +27,12 @@ class ChatToolExecutor {
 
     // MARK: - Bundled Python
 
-    /// Path to the bundled Python 3.12 binary (from Hindsight venv in app bundle).
+    /// Path to the bundled Python 3.12 binary (standalone venv in app bundle).
     /// Used by browser profile tools so they don't depend on system Python or npx.
     private static var bundledPython: String? = {
         guard let resourceURL = Bundle.main.resourceURL else { return nil }
         let python = resourceURL
-            .appendingPathComponent("hindsight")
-            .appendingPathComponent(".venv")
+            .appendingPathComponent("python-venv")
             .appendingPathComponent("bin")
             .appendingPathComponent("python3")
             .path
@@ -47,8 +46,7 @@ class ChatToolExecutor {
     private static var bundledPythonHome: String? = {
         guard let resourceURL = Bundle.main.resourceURL else { return nil }
         let venv = resourceURL
-            .appendingPathComponent("hindsight")
-            .appendingPathComponent(".venv")
+            .appendingPathComponent("python-venv")
             .path
         return FileManager.default.fileExists(atPath: venv) ? venv : nil
     }()
@@ -1111,13 +1109,6 @@ class ChatToolExecutor {
             try await KnowledgeGraphStorage.shared.mergeGraph(nodes: nodeRecords, edges: edgeRecords)
             log("Local graph built with \(nodeRecords.count) nodes, \(edgeRecords.count) edges")
             DispatchQueue.main.async { onKnowledgeGraphUpdated?() }
-
-            // Best-effort: also retain to Hindsight for long-term memory
-            let capturedNodes = nodeRecords
-            let capturedEdges = edgeRecords
-            Task.detached(priority: .utility) {
-                await Self.retainKGToHindsight(nodes: capturedNodes, edges: capturedEdges)
-            }
 
             return "OK: saved \(nodeRecords.count) nodes and \(edgeRecords.count) edges to local knowledge graph"
         } catch {
