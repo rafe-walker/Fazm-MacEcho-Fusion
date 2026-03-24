@@ -250,8 +250,13 @@ actor ACPBridge {
       env["PATH"] = "\(nodeDir):\(existingPath)"
     }
 
-    // Playwright MCP extension mode
+    // Voice Response (TTS) toggle
     let defaults = UserDefaults.standard
+    if defaults.bool(forKey: "voiceResponseEnabled") {
+      env["FAZM_VOICE_RESPONSE"] = "true"
+    }
+
+    // Playwright MCP extension mode
     let useExtension =
       defaults.object(forKey: "playwrightUseExtension") == nil
       || defaults.bool(forKey: "playwrightUseExtension")
