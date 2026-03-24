@@ -15,7 +15,9 @@ class AnalysisOverlayWindow {
     static let shared = AnalysisOverlayWindow()
 
     private var window: NSWindow?
+    private var autoDismissWork: DispatchWorkItem?
     private static let overlayWidth: CGFloat = 340
+    private static let autoDismissDelay: TimeInterval = 15
 
     /// Lock — only one overlay at a time.
     var isShowing: Bool { window != nil }
@@ -81,9 +83,22 @@ class AnalysisOverlayWindow {
 
         panel.makeKeyAndOrderFront(nil)
         self.window = panel
+
+        // Auto-dismiss after 15 seconds
+        let work = DispatchWorkItem { [weak self] in
+            Task { @MainActor in
+                guard let self, self.isShowing else { return }
+                log("AnalysisOverlay: auto-dismissed after \(Int(Self.autoDismissDelay))s")
+                self.dismiss()
+            }
+        }
+        autoDismissWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.autoDismissDelay, execute: work)
     }
 
     func dismiss() {
+        autoDismissWork?.cancel()
+        autoDismissWork = nil
         window?.orderOut(nil)
         window = nil
     }
