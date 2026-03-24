@@ -31,7 +31,7 @@ import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { createServer as createNetServer, type Socket } from "net";
 import { tmpdir } from "os";
-import { unlinkSync, appendFileSync, existsSync, watch, mkdirSync, copyFileSync, readdirSync, writeFileSync, chmodSync } from "fs";
+import { unlinkSync, appendFileSync, existsSync, watch, mkdirSync } from "fs";
 import type {
   InboundMessage,
   OutboundMessage,
@@ -1703,20 +1703,8 @@ async function main(): Promise<void> {
   } catch { /* ignore */ }
 
   logErr(`Bridge main() starting (pid=${process.pid}, node=${process.version}, execPath=${process.execPath})`);
-  logErr(`MCP versions: playwright=${playwrightVersion}, macos-use=${existsSync(macosUseBinary) ? "bundled" : "missing"}, whatsapp=${existsSync(whatsappMcpBinary) ? "bundled" : "missing"}, google-workspace=${existsSync(googleWorkspaceMcpPython) ? "bundled" : "missing"}, hindsight=${existsSync(hindsightPython) ? "bundled" : "missing"}`);
+  logErr(`MCP versions: playwright=${playwrightVersion}, macos-use=${existsSync(macosUseBinary) ? "bundled" : "missing"}, whatsapp=${existsSync(whatsappMcpBinary) ? "bundled" : "missing"}, google-workspace=${existsSync(googleWorkspaceMcpPython) ? "bundled" : "missing"}`);
   logErr(`Playwright MCP config: extension=${process.env.PLAYWRIGHT_USE_EXTENSION ?? "false"}, token=${process.env.PLAYWRIGHT_MCP_EXTENSION_TOKEN ? "set" : "unset"}, outputMode=file, imageResponses=omit, outputDir=/tmp/playwright-mcp`);
-
-  // Start Hindsight Memory MCP server (HTTP, runs in background)
-  // Don't block startup — start it concurrently and set hindsightReady when done
-  const hindsightStartTime = Date.now();
-  startHindsight().then((ready) => {
-    hindsightReady = ready;
-    const elapsed = ((Date.now() - hindsightStartTime) / 1000).toFixed(1);
-    logErr(`Hindsight: ${ready ? "ready" : "not available"} (startup_time=${elapsed}s)`);
-  }).catch((err) => {
-    const elapsed = ((Date.now() - hindsightStartTime) / 1000).toFixed(1);
-    logErr(`Hindsight: startup failed (startup_time=${elapsed}s): ${err}`);
-  });
 
   // Check Google Workspace MCP availability (venv bundled in app)
   logErr(`Google Workspace MCP: ${existsSync(googleWorkspaceMcpPython) ? "ready" : "not available"}`);
