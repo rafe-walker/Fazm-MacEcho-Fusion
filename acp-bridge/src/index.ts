@@ -30,7 +30,7 @@ import { createInterface } from "readline";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { createServer as createNetServer, type Socket } from "net";
-import { tmpdir } from "os";
+import { tmpdir, homedir } from "os";
 import { unlinkSync, appendFileSync, existsSync, watch, mkdirSync } from "fs";
 import type {
   InboundMessage,
@@ -911,10 +911,15 @@ interface WarmupSessionConfig {
   resume?: string;  // if set, resume this session ID instead of creating a new one
 }
 
+// Stable default cwd for ACP sessions — ensures Claude Code's native memory system
+// (MEMORY.md, auto memory) persists across app launches at a consistent path under
+// ~/.claude/projects/. Using ~/Library/Application Support/Fazm avoids TCC/FileProvider
+// prompts (unlike $HOME which can trigger Dropbox/iCloud scanning).
+const DEFAULT_CWD = join(homedir(), "Library", "Application Support", "Fazm");
+
 async function preWarmSession(cwd?: string, sessionConfigs?: WarmupSessionConfig[], models?: string[]): Promise<void> {
-  // Use tmpdir() instead of $HOME to avoid triggering macOS TCC/FileProvider
-  // prompts (e.g. Dropbox) when ACP scans the cwd during session init.
-  const warmCwd = cwd || tmpdir();
+  const warmCwd = cwd || DEFAULT_CWD;
+  try { mkdirSync(warmCwd, { recursive: true }); } catch {}
 
   // Save config so it can be replayed after an OAuth-triggered subprocess restart
   if (sessionConfigs && sessionConfigs.length > 0) {
@@ -1036,7 +1041,7 @@ async function handleQuery(msg: QueryMessage): Promise<void> {
     // Look up a pre-warmed session by sessionKey (falls back to model name for backward compat)
     const requestedModel = msg.model || DEFAULT_MODEL;
     const sessionKey = msg.sessionKey ?? requestedModel;
-    const requestedCwd = msg.cwd || tmpdir();
+    const requestedCwd = msg.cwd || DEFAULT_CWD;
     let sessionId = "";
 
     const existing = sessions.get(sessionKey);
