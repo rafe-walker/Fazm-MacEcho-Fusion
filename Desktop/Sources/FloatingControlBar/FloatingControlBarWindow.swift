@@ -1424,8 +1424,8 @@ class FloatingControlBarManager {
         ) { [weak self] notification in
             Task { @MainActor in
                 guard let provider = self?.chatProvider else { return }
+                log("FloatingControlBarManager: Test Claude auth sheet triggered")
                 let mode = notification.userInfo?["mode"] as? String ?? "initial"
-                log("FloatingControlBarManager: Test Claude auth sheet triggered (mode=\(mode), userInfo=\(notification.userInfo ?? [:]))")
                 if mode == "timeout" {
                     provider.claudeAuthTimedOut = true
                 } else if mode == "failed" {
