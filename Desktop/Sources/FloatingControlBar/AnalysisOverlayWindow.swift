@@ -21,7 +21,7 @@ class AnalysisOverlayWindow {
     var isShowing: Bool { window != nil }
 
     /// Show the analysis overlay positioned above the given bar window frame.
-    func show(below barFrame: NSRect, task: String, activityId: Int64) {
+    func show(below barFrame: NSRect, task: String, description: String? = nil, activityId: Int64) {
         // Only one overlay at a time
         guard !isShowing else {
             log("AnalysisOverlay: already showing, skipping")
@@ -34,7 +34,14 @@ class AnalysisOverlayWindow {
                 onDiscuss: { [weak self] in
                     log("AnalysisOverlay: Discuss tapped (activityId=\(activityId))")
                     self?.dismiss()
-                    // TODO: wire up chat session creation
+
+                    // Update DB status
+                    Task {
+                        await AnalysisOverlayWindow.updateActivityStatus(activityId: activityId, status: "acted", response: "discuss")
+                    }
+
+                    // Inject message into existing floating bar session
+                    AnalysisOverlayWindow.sendDiscussMessage(task: task, description: description)
                 },
                 onHide: { [weak self] in
                     log("AnalysisOverlay: Hide tapped (activityId=\(activityId))")
@@ -80,6 +87,41 @@ class AnalysisOverlayWindow {
         window?.orderOut(nil)
         window = nil
     }
+
+    // MARK: - Discuss Action
+
+    /// Send the analysis context as a user message into the existing floating bar session.
+    private static func sendDiscussMessage(task: String, description: String?) {
+        // Build the message that gets sent as if the user typed it
+        var message = """
+        The screen observer analyzed my last ~60 minutes of activity and identified a task that could be done by AI:
+
+        **Task:** \(task)
+        """
+
+        if let description, !description.isEmpty {
+            message += "\n\n**What was observed:** \(description)"
+        }
+
+        message += """
+
+
+        I'd like to discuss this. Before taking action, please ask me:
+        1. Is this task still relevant — do I still need it done?
+        2. Is it something I'd trust AI to handle, or does it need my judgment?
+        3. Is it repetitive enough to be worth automating as a reusable skill?
+        """
+
+        // Use the testQuery notification to inject into the floating bar session
+        DistributedNotificationCenter.default().postNotificationName(
+            .init("com.fazm.testQuery"),
+            object: nil,
+            userInfo: ["text": message],
+            deliverImmediately: true
+        )
+    }
+
+    // MARK: - DB
 
     /// Update observer_activity row status.
     private static func updateActivityStatus(activityId: Int64, status: String, response: String) async {
