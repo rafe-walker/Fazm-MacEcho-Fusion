@@ -9,7 +9,7 @@
 
 import { createInterface } from "readline";
 import { createConnection } from "net";
-import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from "fs";
+import { readFileSync, writeFileSync, appendFileSync, readdirSync, existsSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { homedir } from "os";
@@ -224,7 +224,7 @@ const ONBOARDING_TOOL_NAMES = new Set([
   "save_knowledge_graph",
 ]);
 
-// Observer session only gets these tools (SQL reads, screenshots, skills, browser profile, cards)
+// Observer session only gets these tools (SQL reads, screenshots, skills, browser profile, cards, memory)
 const OBSERVER_TOOL_NAMES = new Set([
   "execute_sql",
   "capture_screenshot",
@@ -233,6 +233,8 @@ const OBSERVER_TOOL_NAMES = new Set([
   "update_skill",
   "query_browser_profile",
   "save_observer_card",
+  "save_memory",
+  "recall_memory",
 ]);
 
 const ALL_TOOLS = [
@@ -479,6 +481,29 @@ Aim for 15-40 nodes with meaningful edges connecting them.`,
         type: { type: "string" as const, enum: ["insight", "pattern", "skill_created", "kg_update"], description: "Card type (default: insight)" },
       },
       required: ["body"],
+    },
+  },
+  {
+    name: "save_memory",
+    description: `Save an observation or fact to persistent memory. Appends a timestamped entry to a local markdown file. Use this to remember user preferences, patterns, facts, and important context across conversations. Always call recall_memory first to check for duplicates.`,
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        content: { type: "string" as const, description: "The fact, preference, or observation to save" },
+        category: { type: "string" as const, enum: ["preference", "pattern", "fact", "context"], description: "Category of the memory (default: fact)" },
+      },
+      required: ["content"],
+    },
+  },
+  {
+    name: "recall_memory",
+    description: `Read all saved memories from persistent storage. Returns the full memory file. Use this before saving new memories to check for duplicates and to load context at the start of conversations.`,
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        query: { type: "string" as const, description: "Optional keyword to search for (currently returns all memories)" },
+      },
+      required: [],
     },
   },
   {
