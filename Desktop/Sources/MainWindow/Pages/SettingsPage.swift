@@ -519,10 +519,11 @@ struct SettingsContentView: View {
                             .labelsHidden()
                             .onChange(of: voiceResponseEnabled) { _, newValue in
                                 AnalyticsManager.shared.settingToggled(setting: "voice_response", enabled: newValue)
+                                Task { await chatProvider?.restartBridgeForVoiceResponse() }
                             }
                     }
 
-                    Text("When enabled, the AI will speak its response aloud using text-to-speech.")
+                    Text("When enabled, the AI will speak its response aloud using text-to-speech. Takes effect on next message.")
                         .scaledFont(size: 12)
                         .foregroundColor(FazmColors.textTertiary)
                 }
