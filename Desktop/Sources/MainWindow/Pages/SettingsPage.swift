@@ -130,10 +130,10 @@ struct SettingsContentView: View {
     enum SettingsSection: String, CaseIterable {
         case home = "Home"
         case discoveredTasks = "Discovered Tasks"
-        case general = "General"
+        case dictionary = "Dictionary"
         case shortcuts = "Shortcuts"
         case permissions = "Permissions"
-        case dictionary = "Dictionary"
+        case general = "General"
         case advanced = "Advanced"
         case about = "About"
     }
