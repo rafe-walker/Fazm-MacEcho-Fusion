@@ -1399,7 +1399,7 @@ class ChatProvider: ObservableObject {
 
         // Append voice response instructions if enabled
         if voiceResponseEnabled {
-            prompt += "\n\n<voice_response>\nVoice response is enabled. On EVERY final response, you MUST call the speak_response tool with a short, natural spoken summary of your answer (1-3 sentences). This plays audio to the user through their speakers. Keep the spoken text conversational and concise — it complements your written response, not replaces it. Call speak_response BEFORE writing your final text response.\n</voice_response>"
+            prompt += "\n\n<voice_response>\nVoice response is enabled. On EVERY final response, you MUST call the speak_response tool with a short, natural spoken summary of your answer (1-3 sentences). This plays audio to the user through their speakers. Keep the spoken text conversational and concise — it complements your written response, not replaces it. Call speak_response BEFORE writing your final text response.\n\nIMPORTANT: Only use speak_response when the conversation is in a supported language: English, Spanish, French, German, Italian, Dutch, or Japanese. If the user is chatting in any other language (e.g. Russian, Chinese, Korean, Portuguese, Arabic), do NOT call speak_response — just provide the text response without voice. The TTS engine only supports these 7 languages.\n</voice_response>"
         }
 
         // Log prompt context summary
