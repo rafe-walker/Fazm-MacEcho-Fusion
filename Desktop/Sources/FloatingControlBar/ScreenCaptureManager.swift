@@ -25,7 +25,14 @@ class ScreenCaptureManager {
         let ownerName = windowInfo[kCGWindowOwnerName as CFString] as? String ?? "unknown"
 
         // Capture just this window (including its shadow for context)
-        guard let image = Self.captureWindow(windowID) else {
+        // CGWindowListCreateImage is deprecated in macOS 14+ but ScreenCaptureKit requires
+        // async setup and user prompts. This synchronous API still works and is intentional.
+        guard let image = CGWindowListCreateImage(
+            .null,
+            .optionIncludingWindow,
+            windowID,
+            [.boundsIgnoreFraming, .bestResolution]
+        ) else {
             // Window metadata is readable but pixel capture failed — Screen Recording permission is missing/stale
             log("ScreenCaptureManager: Could not capture window '\(ownerName)' for PID \(pid) — likely missing Screen Recording permission")
             return .permissionDenied
@@ -83,18 +90,6 @@ class ScreenCaptureManager {
     }
 
     /// Capture the entire main display.
-    // Isolated to suppress the deprecation warning — ScreenCaptureKit migration is non-trivial
-    // and this synchronous API still works reliably for our use case.
-    @available(macOS, deprecated: 14.0, message: "Migrate to ScreenCaptureKit when feasible")
-    private static func captureWindow(_ windowID: CGWindowID) -> CGImage? {
-        CGWindowListCreateImage(
-            .null,
-            .optionIncludingWindow,
-            windowID,
-            [.boundsIgnoreFraming, .bestResolution]
-        )
-    }
-
     static func captureScreen() -> URL? {
         guard let image = CGDisplayCreateImage(CGMainDisplayID()) else {
             log("ScreenCaptureManager: Could not capture screen")
