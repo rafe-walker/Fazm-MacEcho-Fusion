@@ -229,7 +229,7 @@ struct OnboardingChatView: View {
                                     .padding(.bottom, -4)
                             }
 
-                            HStack(spacing: 8) {
+                            WrappingHStack(spacing: 8) {
                                 ForEach(quickReplyOptions, id: \.self) { option in
                                     Button(action: {
                                         handleQuickReply(option)
