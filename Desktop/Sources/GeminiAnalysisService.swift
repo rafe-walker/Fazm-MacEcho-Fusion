@@ -315,7 +315,7 @@ actor GeminiAnalysisService {
             return nil
         }
 
-        let parsed = parseResult(raw, chunksAnalyzed: chunks.count)
+        let parsed = parseResult(raw, chunksAnalyzed: chunks.count, toolCallCount: toolCallCount, turnsUsed: turnsUsed)
         log("GeminiAnalysis: \(parsed.verdict) (\(chunks.count) chunks, \(toolCallCount) tool calls, \(turnsUsed) turns)")
         if let task = parsed.task {
             log("GeminiAnalysis: task=\(task)")
