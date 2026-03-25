@@ -99,6 +99,22 @@ struct ToolCallsGroup: View {
         calls.contains(where: { $0.status == .running })
     }
 
+    /// Human-readable header label — uses action verb when single call, count when multiple
+    private var headerLabel: String {
+        if calls.count == 1, let call = calls.first {
+            return ChatToolInfo.humanReadableToolAction(for: call.name)
+        }
+        return "\(calls.count) actions"
+    }
+
+    /// Detail text shown next to the header label
+    private var headerDetail: String {
+        if calls.count == 1, let call = calls.first {
+            return call.input?.summary ?? ""
+        }
+        return inlineSummary
+    }
+
     /// One-line inline summary: shows what's happening right now
     private var inlineSummary: String {
         guard let call = latestCall else { return "" }
@@ -147,14 +163,16 @@ struct ToolCallsGroup: View {
                             .foregroundColor(.green)
                     }
 
-                    Text("\(calls.count) tool \(calls.count == 1 ? "call" : "calls")")
+                    Text(headerLabel)
                         .scaledFont(size: 12, weight: .medium)
 
-                    Text(inlineSummary)
-                        .scaledFont(size: 11)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+                    if !headerDetail.isEmpty {
+                        Text(headerDetail)
+                            .scaledFont(size: 11)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
 
                     if hasRunningCalls {
                         ToolElapsedTime()
