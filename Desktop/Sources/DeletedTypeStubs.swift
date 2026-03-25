@@ -180,34 +180,6 @@ struct ServerMemory: Identifiable, Codable, Equatable {
     var content: String
 }
 
-enum GoalType: String, Codable {
-    case boolean
-    case numeric
-    case percentage
-}
-
-struct Goal: Identifiable, Codable, Equatable {
-    var id: String
-    var title: String
-    var description: String?
-    var isActive: Bool = true
-    var goalType: GoalType = .boolean
-    var currentValue: Double = 0
-    var targetValue: Double = 1
-    var unit: String?
-}
-
-struct TaskActionItem: Identifiable, Codable, Equatable {
-    var id: String
-    var title: String
-    var description: String
-    var completed: Bool = false
-    var deleted: Bool? = false
-    var priority: String?
-    var category: String?
-    var dueAt: Date?
-}
-
 // MARK: - InstalledApp Model (Chat apps)
 
 struct InstalledApp: Identifiable, Codable, Equatable {
@@ -881,24 +853,6 @@ class RewindIndexer {
 
 // MARK: - Storage Actors
 
-actor ActionItemStorage {
-    static let shared = ActionItemStorage()
-    func getLocalActionItems(limit: Int = 50, completed: Bool? = nil, filter: String? = nil) async throws -> [TaskActionItem] { [] }
-    func getLocalActionItem(id: String) async -> TaskActionItem? { nil }
-    func getLocalActionItem(byBackendId id: String) async throws -> TaskActionItem? { nil }
-    func actionItemExists(id: String) async -> Bool { false }
-    func actionItemExists(description: String) async -> Bool { false }
-    struct FilterCounts {
-        var all: Int = 0
-        var today: Int = 0
-        var upcoming: Int = 0
-        var completed: Int = 0
-        var todo: Int = 0
-        var done: Int = 0
-        var deleted: Int = 0
-    }
-    func getFilterCounts() async -> FilterCounts { FilterCounts() }
-}
 
 @MainActor
 class AdviceStorage: ObservableObject {
@@ -917,10 +871,6 @@ class FocusStorage: ObservableObject {
     @Published var currentStatus: FocusStatus? = nil
 }
 
-actor GoalStorage {
-    static let shared = GoalStorage()
-    func getLocalGoals(activeOnly: Bool = false) async throws -> [Goal] { [] }
-}
 
 actor MemoryStorage {
     static let shared = MemoryStorage()
@@ -943,22 +893,6 @@ class DashboardViewModel: ObservableObject {
     func loadDashboardData() async {}
 }
 
-@MainActor
-class TasksViewModel: ObservableObject {
-    var chatCoordinator: TaskChatCoordinator?
-}
-
-@MainActor
-class TasksStore: ObservableObject {
-    static let shared = TasksStore()
-    var isActive: Bool = false
-    func loadTasks() async {}
-    func toggleTask(_ task: TaskActionItem) async {}
-    func deleteTask(_ task: TaskActionItem) async {}
-    func createTask(description: String, dueAt: Date? = nil, priority: String? = nil) async {}
-    func retryUnsyncedItems(includeRecent: Bool = false) async {}
-    func reloadFromLocalCache() async {}
-}
 
 @MainActor
 class MemoriesViewModel: ObservableObject {
@@ -966,10 +900,6 @@ class MemoriesViewModel: ObservableObject {
     func loadMemories() async {}
 }
 
-@MainActor
-class TaskChatCoordinator: ObservableObject {
-    init(chatProvider: ChatProvider) {}
-}
 
 @MainActor
 class AppProvider: ObservableObject {
@@ -1006,8 +936,6 @@ struct MemoriesPage: View {
 }
 
 struct TasksPage: View {
-    var viewModel: TasksViewModel
-    var chatCoordinator: TaskChatCoordinator
     var chatProvider: ChatProvider
     var body: some View {
         Text("Tasks")
