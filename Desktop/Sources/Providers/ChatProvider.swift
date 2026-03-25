@@ -2097,7 +2097,7 @@ class ChatProvider: ObservableObject {
                     if status == "started" {
                         toolNames.append(name)
                         toolStartTimes[name] = Date()
-                        if (name.contains("browser") || name.contains("playwright")) && !name.contains("setup_browser_extension") {
+                        if name.hasPrefix("mcp__playwright__") {
                             let token = UserDefaults.standard.string(forKey: "playwrightExtensionToken") ?? ""
                             if token.isEmpty {
                                 log("ChatProvider: Browser tool \(name) called without extension token — aborting query and prompting setup")
