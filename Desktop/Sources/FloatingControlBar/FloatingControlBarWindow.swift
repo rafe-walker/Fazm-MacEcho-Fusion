@@ -399,6 +399,9 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
         // a layered close effect instead of everything moving at once.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) { [weak self] in
             guard let self = self else { return }
+            // Force-complete any in-flight window frame animation to prevent
+            // stale _NSWindowTransformAnimation objects from accumulating.
+            self.setFrame(self.frame, display: false, animate: false)
             NSAnimationContext.beginGrouping()
             NSAnimationContext.current.duration = 0.35
             NSAnimationContext.current.allowsImplicitAnimation = false
