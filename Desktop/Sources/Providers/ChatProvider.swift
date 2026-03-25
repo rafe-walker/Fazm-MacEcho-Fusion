@@ -630,10 +630,6 @@ class ChatProvider: ObservableObject {
     private var forceNewTextBlock: Bool = false
 
     // MARK: - Cached Context for Prompts
-    private var cachedGoals: [Goal] = []
-    private var goalsLoaded = false
-    private var cachedTasks: [TaskActionItem] = []
-    private var tasksLoaded = false
     private var cachedAIProfile: String = ""
     private var aiProfileLoaded = false
     private var cachedDatabaseSchema: String = ""
@@ -1162,87 +1158,6 @@ class ChatProvider: ObservableObject {
 
     // MARK: - Load Context
 
-    // MARK: - Load Goals
-
-    /// Loads user goals from local SQLite for use in prompts
-    private func loadGoalsIfNeeded() async {
-        guard !goalsLoaded else { return }
-
-        do {
-            cachedGoals = try await GoalStorage.shared.getLocalGoals(activeOnly: false)
-            goalsLoaded = true
-            log("ChatProvider loaded \(cachedGoals.count) goals from local DB")
-        } catch {
-            logError("Failed to load goals for chat context", error: error)
-        }
-    }
-
-    /// Formats goals into a prompt section
-    private func formatGoalSection() -> String {
-        let activeGoals = cachedGoals.filter { $0.isActive }
-        guard !activeGoals.isEmpty else { return "" }
-
-        var lines: [String] = ["\n<user_goals>"]
-        for goal in activeGoals {
-            var line = "- \(goal.title)"
-            if let desc = goal.description, !desc.isEmpty {
-                line += ": \(desc)"
-            }
-            if goal.goalType != .boolean {
-                line += " (progress: \(Int(goal.currentValue))/\(Int(goal.targetValue))"
-                if let unit = goal.unit, !unit.isEmpty { line += " \(unit)" }
-                line += ")"
-            }
-            lines.append(line)
-        }
-        lines.append("</user_goals>")
-        return lines.joined(separator: "\n")
-    }
-
-    // MARK: - Load Tasks
-
-    /// Fetches the latest 20 active tasks from local database for context
-    private func loadTasksIfNeeded() async {
-        guard !tasksLoaded else { return }
-
-        do {
-            cachedTasks = try await ActionItemStorage.shared.getLocalActionItems(
-                limit: 20,
-                completed: false
-            )
-            tasksLoaded = true
-            log("ChatProvider loaded \(cachedTasks.count) tasks for context")
-        } catch {
-            logError("Failed to load tasks for chat context", error: error)
-            tasksLoaded = true
-        }
-    }
-
-    /// Formats cached tasks into a prompt section
-    private func formatTasksSection() -> String {
-        guard !cachedTasks.isEmpty else { return "" }
-
-        var lines: [String] = ["\n<user_tasks>", "Current tasks:"]
-        for task in cachedTasks {
-            var line = "- \(task.description)"
-            if let priority = task.priority {
-                line += " [priority: \(priority)]"
-            }
-            if let dueAt = task.dueAt {
-                let formatter = DateFormatter()
-                formatter.dateStyle = .short
-                formatter.timeStyle = .short
-                line += " [due: \(formatter.string(from: dueAt))]"
-            }
-            if let category = task.category {
-                line += " [category: \(category)]"
-            }
-            lines.append(line)
-        }
-        lines.append("</user_tasks>")
-        return lines.joined(separator: "\n")
-    }
-
     // MARK: - Load AI User Profile
 
     /// Fetches the latest AI-generated user profile from local database
@@ -1383,16 +1298,10 @@ class ChatProvider: ObservableObject {
         // Get user name from AuthService
         let userName = AuthService.shared.displayName.isEmpty ? "there" : AuthService.shared.givenName
 
-        // Build individual sections
-        let goalSection = formatGoalSection()
-        let tasksSection = formatTasksSection()
         let aiProfileSection = formatAIProfileSection()
 
-        // Build base prompt with goals, AI profile, and dynamic schema
         var prompt = ChatPromptBuilder.buildDesktopChat(
             userName: userName,
-            goalSection: goalSection,
-            tasksSection: tasksSection,
             aiProfileSection: aiProfileSection,
             databaseSchema: cachedDatabaseSchema
         )
