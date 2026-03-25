@@ -102,7 +102,7 @@ struct ToolCallsGroup: View {
     /// Human-readable header label — uses action verb when single call, count when multiple
     private var headerLabel: String {
         if calls.count == 1, let call = calls.first {
-            return ChatToolInfo.humanReadableToolAction(for: call.name)
+            return ChatContentBlock.displayName(for: call.name)
         }
         return "\(calls.count) actions"
     }
