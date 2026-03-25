@@ -49,6 +49,7 @@ class FloatingControlBarState: NSObject, ObservableObject {
     /// Observer cards queued while a query is streaming — rendered below the current response.
     @Published var pendingObserverExchanges: [FloatingChatExchange] = []
     @Published var suggestedReplies: [String] = []
+    @Published var suggestedReplyQuestion: String = ""
 
     /// Convenience accessor for plain-text response (used by window geometry and error handling).
     var aiResponseText: String {
