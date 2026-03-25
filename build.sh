@@ -13,6 +13,9 @@ BUNDLE_ID="com.fazm.app"
 BUILD_DIR="build"
 APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
 
+# Use Xcode's default toolchain to match the SDK version
+unset TOOLCHAINS
+
 echo "Building $APP_NAME..."
 
 # Verify all DB tables have schema annotations before building
@@ -63,10 +66,10 @@ else
 fi
 
 # Build release binary
-swift build -c release --package-path Desktop
+xcrun swift build -c release --package-path Desktop
 
 # Get the built binary path
-BINARY_PATH=$(swift build -c release --package-path Desktop --show-bin-path)/$BINARY_NAME
+BINARY_PATH=$(xcrun swift build -c release --package-path Desktop --show-bin-path)/$BINARY_NAME
 
 if [ ! -f "$BINARY_PATH" ]; then
     echo "Error: Binary not found at $BINARY_PATH"
@@ -86,7 +89,7 @@ cp "$BINARY_PATH" "$APP_BUNDLE/Contents/MacOS/$BINARY_NAME"
 echo "Building mcp-server-macos-use..."
 MCP_REPO="$HOME/mcp-server-macos-use"
 if [ -d "$MCP_REPO" ]; then
-    swift build -c release --package-path "$MCP_REPO"
+    xcrun swift build -c release --package-path "$MCP_REPO"
     cp "$MCP_REPO/.build/release/mcp-server-macos-use" "$APP_BUNDLE/Contents/MacOS/mcp-server-macos-use"
     echo "Bundled mcp-server-macos-use"
 else
@@ -97,7 +100,7 @@ fi
 echo "Building whatsapp-mcp..."
 MCP_WHATSAPP="$HOME/whatsapp-mcp-skill-macos"
 if [ -d "$MCP_WHATSAPP" ]; then
-    swift build -c release --package-path "$MCP_WHATSAPP"
+    xcrun swift build -c release --package-path "$MCP_WHATSAPP"
     cp "$MCP_WHATSAPP/.build/release/whatsapp-mcp" "$APP_BUNDLE/Contents/MacOS/whatsapp-mcp"
     echo "Bundled whatsapp-mcp"
 else
@@ -117,7 +120,7 @@ cp fazm_icon.icns "$APP_BUNDLE/Contents/Resources/FazmIcon.icns"
 /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName $APP_NAME" "$APP_BUNDLE/Contents/Info.plist"
 
 # Copy resource bundle (contains app assets like herologo.png, omi-with-rope-no-padding.webp, etc.)
-SWIFT_BUILD_DIR=$(swift build -c release --package-path Desktop --show-bin-path)
+SWIFT_BUILD_DIR=$(xcrun swift build -c release --package-path Desktop --show-bin-path)
 if [ -d "$SWIFT_BUILD_DIR/Fazm_Fazm.bundle" ]; then
     cp -R "$SWIFT_BUILD_DIR/Fazm_Fazm.bundle" "$APP_BUNDLE/Contents/Resources/"
     echo "Copied resource bundle"
