@@ -197,6 +197,8 @@ actor GeminiAnalysisService {
                 "verdict": result.verdict,
                 "chunks_analyzed": result.chunksAnalyzed,
                 "response": result.raw,
+                "tool_call_count": result.toolCallCount,
+                "turns_used": result.turnsUsed,
             ]
             if let task = result.task {
                 properties["task"] = task
@@ -958,7 +960,7 @@ actor GeminiAnalysisService {
         return lines.joined(separator: "\n")
     }
 
-    private func parseResult(_ raw: String, chunksAnalyzed: Int) -> AnalysisResult {
+    private func parseResult(_ raw: String, chunksAnalyzed: Int, toolCallCount: Int = 0, turnsUsed: Int = 0) -> AnalysisResult {
         let lines = raw.components(separatedBy: "\n")
 
         var verdict = "NO_TASK"
@@ -991,7 +993,7 @@ actor GeminiAnalysisService {
             document = documentLines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
-        return AnalysisResult(verdict: verdict, task: task, description: description, document: document, raw: raw, chunksAnalyzed: chunksAnalyzed)
+        return AnalysisResult(verdict: verdict, task: task, description: description, document: document, raw: raw, chunksAnalyzed: chunksAnalyzed, toolCallCount: toolCallCount, turnsUsed: turnsUsed)
     }
 
     private func cleanupChunkFiles(chunks: [ChunkEntry]) {
