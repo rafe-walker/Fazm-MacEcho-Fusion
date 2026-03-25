@@ -1825,6 +1825,15 @@ class FloatingControlBarManager {
         // Handle errors after sendMessage completes
         barWindow.state.isAILoading = false
 
+        // Sync the latest AI message directly from provider.messages to close the
+        // race window where sendMessage has returned but the Combine $messages sink
+        // (scheduled via .receive(on: .main)) hasn't fired yet. Without this,
+        // tool-call-only responses can briefly flash "Failed to get a response".
+        if let latestAI = provider.messages.last, latestAI.sender == .ai,
+           !latestAI.text.isEmpty || !latestAI.contentBlocks.isEmpty {
+            barWindow.state.currentAIMessage = latestAI
+        }
+
         // Don't update bar state if the conversation was closed while the query was in flight.
         // Without this guard, the post-completion code sets showingAIResponse = true and resizes
         // the window, creating a phantom gray box after the user pressed Esc.
