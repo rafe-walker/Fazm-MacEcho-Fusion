@@ -797,6 +797,7 @@ class FloatingControlBarWindow: NSWindow, NSWindowDelegate {
             }
             resizeWorkItem = DispatchWorkItem(block: doResize)
             DispatchQueue.main.async(execute: resizeWorkItem!)
+        }
     }
 
     /// Resize window for PTT state (expanded when listening, compact circle when idle)
