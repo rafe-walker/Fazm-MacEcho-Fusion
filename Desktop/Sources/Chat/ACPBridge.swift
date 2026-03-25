@@ -886,7 +886,12 @@ actor ACPBridge {
   }
 
   private func deliverMessage(_ message: InboundMessage) {
-    // Handle auth messages immediately via global handlers (even outside query)
+    // Handle auth messages via global handlers. Auth UI state (sheets, buttons)
+    // must update regardless of whether a query is in-flight. For auth_required,
+    // only fire the global handler when no query is active (the query loop handles
+    // it via its own callback). For auth_success/timeout/failed, ALWAYS fire the
+    // global handler so the UI updates immediately, AND still deliver to the query
+    // loop (which may also need to react).
     switch message {
     case .authRequired(let methods, let authUrl):
       if messageContinuation == nil, let handler = onAuthRequiredGlobal {
@@ -895,18 +900,22 @@ actor ACPBridge {
         return
       }
     case .authSuccess:
-      if messageContinuation == nil, let handler = onAuthSuccessGlobal {
-        handler()
-        return
+      // Always fire global handler so UI clears auth sheets/buttons immediately,
+      // even if a query is in-flight. The message is still delivered to the query loop below.
+      onAuthSuccessGlobal?()
+      if messageContinuation == nil {
+        return  // No query waiting — nothing more to deliver
       }
     case .authTimeout(let reason):
-      if messageContinuation == nil, let handler = onAuthTimeoutGlobal {
-        handler(reason)
+      // Always fire global handler so UI shows timeout state
+      onAuthTimeoutGlobal?(reason)
+      if messageContinuation == nil {
         return
       }
     case .authFailed(let reason, let httpStatus):
-      if messageContinuation == nil, let handler = onAuthFailedGlobal {
-        handler(reason, httpStatus)
+      // Always fire global handler so UI shows failure state
+      onAuthFailedGlobal?(reason, httpStatus)
+      if messageContinuation == nil {
         return
       }
     case .observerPoll:
