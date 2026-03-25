@@ -172,8 +172,8 @@ struct ClaudeAuthSheet: View {
                         isConnecting = true
                         showRetryOption = false
                         onConnect()
-                        // After 10 seconds, show retry options so user isn't stuck
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+                        // After 5 seconds, show retry options so user isn't stuck
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
                             if isConnecting && !hasTimedOut && !hasFailed {
                                 withAnimation(.easeIn(duration: 0.2)) {
                                     showRetryOption = true
