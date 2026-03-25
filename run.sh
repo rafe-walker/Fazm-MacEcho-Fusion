@@ -259,6 +259,8 @@ with open('$WORKSPACE_MCP_REPO/pyproject.toml', 'rb') as f:
             if [ -d "$GWMCP_MANAGED_DIR/lib/python3.12" ]; then
                 rsync -a --ignore-existing "$GWMCP_MANAGED_DIR/lib/python3.12/" "$WORKSPACE_MCP_BUNDLE/.venv/lib/python3.12/"
             fi
+            # Rewrite pyvenv.cfg so Python finds stdlib relative to venv, not the managed install
+            printf 'home = bin\nimplementation = CPython\nversion_info = 3.12\ninclude-system-site-packages = false\n' > "$WORKSPACE_MCP_BUNDLE/.venv/pyvenv.cfg"
         fi
         substep "Bundled Google Workspace MCP with venv"
     else
