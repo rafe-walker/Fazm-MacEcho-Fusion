@@ -1,5 +1,6 @@
 import Cocoa
 import GRDB
+import PostHog
 import SwiftUI
 
 /// NSPanel subclass that can become key (required for buttons to work in a borderless floating panel).
@@ -35,6 +36,10 @@ class AnalysisOverlayWindow {
                 task: task,
                 onDiscuss: { [weak self] in
                     log("AnalysisOverlay: Discuss tapped (activityId=\(activityId))")
+                    PostHogSDK.shared.capture("discovered_task_overlay_discuss", properties: [
+                        "task_title": String(task.prefix(100)),
+                        "activity_id": activityId,
+                    ])
                     self?.dismiss()
 
                     // Update DB status
@@ -47,6 +52,10 @@ class AnalysisOverlayWindow {
                 },
                 onHide: { [weak self] in
                     log("AnalysisOverlay: Hide tapped (activityId=\(activityId))")
+                    PostHogSDK.shared.capture("discovered_task_overlay_dismissed", properties: [
+                        "task_title": String(task.prefix(100)),
+                        "activity_id": activityId,
+                    ])
                     self?.dismiss()
                     Task {
                         await AnalysisOverlayWindow.updateActivityStatus(activityId: activityId, status: "dismissed", response: "hide")
@@ -83,6 +92,11 @@ class AnalysisOverlayWindow {
 
         panel.makeKeyAndOrderFront(nil)
         self.window = panel
+
+        PostHogSDK.shared.capture("discovered_task_overlay_shown", properties: [
+            "task_title": String(task.prefix(100)),
+            "activity_id": activityId,
+        ])
 
         // Auto-dismiss after 15 seconds
         let work = DispatchWorkItem { [weak self] in
