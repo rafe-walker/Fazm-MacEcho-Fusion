@@ -1881,6 +1881,12 @@ class ChatProvider: ObservableObject {
             }
         }
 
+        // Remove any existing enqueued copy to avoid sending the same message twice
+        // (e.g. user enqueues a follow-up, then taps "Send Now" on the queued item)
+        if let existingIdx = pendingMessages.firstIndex(where: { $0.text == trimmedText }) {
+            pendingMessages.remove(at: existingIdx)
+        }
+
         // Insert at front of queue and interrupt
         pendingMessages.insert((text: trimmedText, sessionKey: activeSessionKey), at: 0)
         await acpBridge.interrupt()
