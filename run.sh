@@ -134,6 +134,30 @@ else
     substep "Downloaded ffmpeg to $FFMPEG_RESOURCE"
 fi
 
+step "Ensuring cloudflared binary..."
+CLOUDFLARED_RESOURCE="Desktop/Sources/Resources/cloudflared"
+if [ -x "$CLOUDFLARED_RESOURCE" ]; then
+    substep "cloudflared binary already present"
+else
+    substep "Downloading cloudflared for dev build..."
+    ARCH=$(uname -m)
+    if [ "$ARCH" = "arm64" ]; then
+        CF_ARCH="arm64"
+    else
+        CF_ARCH="amd64"
+    fi
+    CF_TEMP="/tmp/cloudflared-dev-$$"
+    mkdir -p "$CF_TEMP"
+    curl -L -o "$CF_TEMP/cloudflared.tgz" \
+        "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-$CF_ARCH.tgz"
+    tar -xzf "$CF_TEMP/cloudflared.tgz" -C "$CF_TEMP"
+    cp "$CF_TEMP/cloudflared" "$CLOUDFLARED_RESOURCE"
+    chmod +x "$CLOUDFLARED_RESOURCE"
+    codesign -f -s - "$CLOUDFLARED_RESOURCE"
+    rm -rf "$CF_TEMP"
+    substep "Downloaded cloudflared to $CLOUDFLARED_RESOURCE"
+fi
+
 step "Checking schema docs..."
 bash scripts/check_schema_docs.sh
 
@@ -327,6 +351,12 @@ if [ -n "$SIGN_IDENTITY" ]; then
     if [ -f "$NODE_BIN" ]; then
         substep "Signing bundled node binary"
         codesign --force --options runtime --entitlements Desktop/Node.entitlements --sign "$SIGN_IDENTITY" "$NODE_BIN"
+    fi
+    # Sign the bundled cloudflared binary
+    CLOUDFLARED_BIN="$APP_BUNDLE/Contents/Resources/Fazm_Fazm.bundle/cloudflared"
+    if [ -f "$CLOUDFLARED_BIN" ]; then
+        substep "Signing bundled cloudflared binary"
+        codesign --force --options runtime --sign "$SIGN_IDENTITY" "$CLOUDFLARED_BIN"
     fi
     MCP_BIN="$APP_BUNDLE/Contents/MacOS/mcp-server-macos-use"
     if [ -f "$MCP_BIN" ]; then
