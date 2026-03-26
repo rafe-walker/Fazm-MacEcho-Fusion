@@ -150,6 +150,7 @@
     "Smarter task discovery: the screen observer now understands your context (profile, chat history, goals) and can query your data before suggesting tasks",
     "Fixed screen recording capturing wrong window when multiple windows are open",
     "Added screen recording permission prompt for beta users who haven't granted it yet",
-    "Added Remote Control settings section with QR code, connection status, and setup instructions for phone control"
+    "Added Remote Control settings section with QR code, connection status, and setup instructions for phone control",
+    "Fixed Google Workspace connection breaking after app updates"
   ]
 }
