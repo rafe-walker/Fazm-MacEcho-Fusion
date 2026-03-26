@@ -1785,7 +1785,7 @@ class ChatProvider: ObservableObject {
 
     /// Queue of messages waiting to be sent after the current query finishes.
     /// Replaces the old single pendingFollowUpText. Checked at the end of `sendMessage`.
-    private var pendingMessages: [(text: String, sessionKey: String?)] = []
+    private var pendingMessages: [(text: String, sessionKey: String?, userMessageAdded: Bool)] = []
     /// Read-only accessor for pending message texts (used by UI to sync deletions).
     var pendingMessageTexts: [String] { pendingMessages.map(\.text) }
     /// Session key of the currently running sendMessage call, so follow-ups can be chained on the same session.
@@ -1840,7 +1840,7 @@ class ChatProvider: ObservableObject {
     func enqueueMessage(_ text: String) {
         let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedText.isEmpty else { return }
-        pendingMessages.append((text: trimmedText, sessionKey: activeSessionKey))
+        pendingMessages.append((text: trimmedText, sessionKey: activeSessionKey, userMessageAdded: false))
         log("ChatProvider: message enqueued (\(pendingMessages.count) pending)")
     }
 
@@ -1887,8 +1887,8 @@ class ChatProvider: ObservableObject {
             pendingMessages.remove(at: existingIdx)
         }
 
-        // Insert at front of queue and interrupt
-        pendingMessages.insert((text: trimmedText, sessionKey: activeSessionKey), at: 0)
+        // Insert at front of queue and interrupt — userMessageAdded=true because we added it above
+        pendingMessages.insert((text: trimmedText, sessionKey: activeSessionKey, userMessageAdded: true), at: 0)
         await acpBridge.interrupt()
         log("ChatProvider: interrupt+send, \(pendingMessages.count) pending")
     }
@@ -2541,7 +2541,7 @@ class ChatProvider: ObservableObject {
             log("ChatProvider: chaining queued message (\(pendingMessages.count) remaining)")
             // Notify UI to dequeue (posted on main actor)
             NotificationCenter.default.post(name: .chatProviderDidDequeue, object: nil, userInfo: ["text": next.text])
-            await sendMessage(next.text, isFollowUp: true, sessionKey: next.sessionKey)
+            await sendMessage(next.text, isFollowUp: next.userMessageAdded, sessionKey: next.sessionKey)
         }
     }
 
