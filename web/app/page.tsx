@@ -8,7 +8,7 @@ import Chat from "@/components/Chat";
 
 export default function Home() {
   const { user, loading, token, signIn, signOut } = useAuth();
-  const { isConnected, isDesktopOnline, messages, sendMessage, isSending } =
+  const { isConnected, isDesktopOnline, messages, sendMessage, stopGeneration, isSending } =
     useDesktopRelay(token);
 
   if (loading) {
@@ -62,6 +62,7 @@ export default function Home() {
       <Chat
         messages={messages}
         onSend={sendMessage}
+        onStop={stopGeneration}
         isSending={isSending}
         isDesktopOnline={isDesktopOnline}
         isConnected={isConnected}
