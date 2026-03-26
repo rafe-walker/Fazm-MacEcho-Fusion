@@ -284,6 +284,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // Start the always-on observer recorder for Gemini analysis (local-only, no feature flag)
         SessionRecordingManager.shared.startObserver()
 
+        // Test trigger: show session recording permission prompt
+        // xcrun swift -e 'import Foundation; DistributedNotificationCenter.default().postNotificationName(.init("com.fazm.testSessionRecordingPermission"), object: nil, userInfo: nil, deliverImmediately: true); RunLoop.current.run(until: Date(timeIntervalSinceNow: 1.0))'
+        DistributedNotificationCenter.default().addObserver(
+            forName: NSNotification.Name("com.fazm.testSessionRecordingPermission"),
+            object: nil, queue: .main
+        ) { _ in
+            SessionRecordingPermissionWindowController.shared.showForTesting()
+        }
+
         // One-time migration: Switch existing users from personal OAuth to Vertex built-in
         migrateBridgeModeToBuiltin()
 
