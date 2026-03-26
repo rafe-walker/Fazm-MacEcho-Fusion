@@ -335,9 +335,13 @@ final class UpdaterViewModel: ObservableObject {
     }
 
     private init() {
+        let isDevBuild = Bundle.main.bundleIdentifier == "com.fazm.desktop-dev"
+
         // Initialize the updater controller with our delegate
+        // Dev builds: don't start the updater — local builds have invalid code signatures
+        // so Sparkle installs always fail, causing the App Management guide to loop.
         updaterController = SPUStandardUpdaterController(
-            startingUpdater: true,
+            startingUpdater: !isDevBuild,
             updaterDelegate: updaterDelegate,
             userDriverDelegate: userDriverDelegate
         )
@@ -394,7 +398,10 @@ final class UpdaterViewModel: ObservableObject {
         // On launch, probe App Management permission if we previously showed the guide.
         // This handles the "Quit & Reopen" flow: user grants permission → app restarts →
         // we detect permission is now granted → show "done" guide → auto-trigger update.
-        if !UserDefaults.standard.bool(forKey: "hasSuccessfullyInstalledSparkleUpdate"),
+        // Skip for dev builds — they have invalid code signatures so Sparkle installs always
+        // fail with 4005, which resets the flag and causes this guide to show on every launch.
+        if Bundle.main.bundleIdentifier != "com.fazm.desktop-dev",
+           !UserDefaults.standard.bool(forKey: "hasSuccessfullyInstalledSparkleUpdate"),
            let guideVersion = UserDefaults.standard.string(forKey: "appManagementGuideLastShownVersion") {
             probeAndUnlockAppManagement(guideVersion: guideVersion)
         }
