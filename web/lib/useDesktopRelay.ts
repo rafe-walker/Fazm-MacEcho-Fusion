@@ -167,7 +167,7 @@ export function useDesktopRelay(token: string | null): RelayHook {
         setMessages((prev) =>
           prev.map((m) =>
             m.id === id
-              ? { ...m, text: msg.text as string, isStreaming: false }
+              ? { ...m, text: (msg.text as string).trim(), isStreaming: false }
               : m
           )
         );
