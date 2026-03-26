@@ -970,6 +970,50 @@ actor AppDatabase {
                           on: "observer_activity", columns: ["status", "type"])
         }
 
+        migrator.registerMigration("fazmV5") { db in
+            // Add session_id to distinguish separate conversations
+            try db.execute(sql: "ALTER TABLE chat_messages ADD COLUMN session_id TEXT")
+            try db.create(index: "idx_chat_messages_session",
+                          on: "chat_messages", columns: ["session_id"])
+
+            // Full-text search over chat messages for fast keyword lookup
+            try db.execute(sql: """
+                CREATE VIRTUAL TABLE chat_messages_fts USING fts5(
+                    messageText,
+                    content='chat_messages',
+                    content_rowid='rowid'
+                )
+            """)
+
+            // Populate FTS with existing messages
+            try db.execute(sql: """
+                INSERT INTO chat_messages_fts(rowid, messageText)
+                SELECT rowid, messageText FROM chat_messages
+            """)
+
+            // Keep FTS in sync on insert
+            try db.execute(sql: """
+                CREATE TRIGGER chat_messages_fts_insert AFTER INSERT ON chat_messages BEGIN
+                    INSERT INTO chat_messages_fts(rowid, messageText) VALUES (new.rowid, new.messageText);
+                END
+            """)
+
+            // Keep FTS in sync on update
+            try db.execute(sql: """
+                CREATE TRIGGER chat_messages_fts_update AFTER UPDATE OF messageText ON chat_messages BEGIN
+                    INSERT INTO chat_messages_fts(chat_messages_fts, rowid, messageText) VALUES('delete', old.rowid, old.messageText);
+                    INSERT INTO chat_messages_fts(rowid, messageText) VALUES (new.rowid, new.messageText);
+                END
+            """)
+
+            // Keep FTS in sync on delete
+            try db.execute(sql: """
+                CREATE TRIGGER chat_messages_fts_delete AFTER DELETE ON chat_messages BEGIN
+                    INSERT INTO chat_messages_fts(chat_messages_fts, rowid, messageText) VALUES('delete', old.rowid, old.messageText);
+                END
+            """)
+        }
+
         try migrator.migrate(queue)
     }
 
