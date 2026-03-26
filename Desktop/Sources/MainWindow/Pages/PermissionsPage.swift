@@ -62,8 +62,6 @@ struct PermissionsPage: View {
                     // Screen Recording Permission
                     ScreenRecordingPermissionSection(appState: appState)
 
-                    // Notification Permission
-                    NotificationPermissionSection(appState: appState)
                 }
 
                 // All permissions granted message
