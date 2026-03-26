@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { trackEvent } from "./posthog";
 
 export interface ChatMessage {
   id: string;
@@ -54,6 +55,7 @@ export function useDesktopRelay(token: string | null): RelayHook {
       });
 
       if (!res.ok) {
+        trackEvent("web_relay_discover_failed", { status: res.status });
         setOffline();
         reconnectTimer.current = setTimeout(connect, 5000);
         return;
@@ -61,6 +63,7 @@ export function useDesktopRelay(token: string | null): RelayHook {
 
       const { tunnel_url } = await res.json();
       if (!tunnel_url) {
+        trackEvent("web_relay_discover_failed", { reason: "no_tunnel_url" });
         setOffline();
         reconnectTimer.current = setTimeout(connect, 5000);
         return;
@@ -74,6 +77,7 @@ export function useDesktopRelay(token: string | null): RelayHook {
       ws.onopen = () => {
         setIsConnected(true);
         setOnline();
+        trackEvent("web_relay_connected");
         ws.send(JSON.stringify({ type: "request_history" }));
       };
 
@@ -87,13 +91,16 @@ export function useDesktopRelay(token: string | null): RelayHook {
         setOffline();
         setIsSending(false);
         wsRef.current = null;
+        trackEvent("web_relay_disconnected");
         reconnectTimer.current = setTimeout(connect, 3000);
       };
 
       ws.onerror = () => {
+        trackEvent("web_connection_error");
         ws.close();
       };
-    } catch {
+    } catch (err) {
+      trackEvent("web_connection_error", { error: (err as Error).message });
       reconnectTimer.current = setTimeout(connect, 5000);
     }
   }, [token, backendUrl, setOffline, setOnline]);
@@ -103,6 +110,7 @@ export function useDesktopRelay(token: string | null): RelayHook {
       case "chat_history": {
         const history = (msg.messages as ChatMessage[]) || [];
         setMessages(history);
+        trackEvent("web_chat_history_loaded", { message_count: history.length });
         break;
       }
 
