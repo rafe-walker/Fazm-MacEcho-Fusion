@@ -1,88 +1,110 @@
 import SwiftUI
 import AppKit
 
+/// Observable state shared between the view and window controller.
+@MainActor
+class SessionRecordingPermissionState: ObservableObject {
+    @Published var hasClickedGrant = false
+    @Published var isGranted = false
+}
+
 /// Compact overlay shown when screen recording permission is needed.
 /// Shows the same tutorial GIF as the permissions page with a single button.
 struct SessionRecordingPermissionSheet: View {
     let onGrantPermission: () -> Void
     let onDismiss: () -> Void
-
-    @State private var hasClickedGrant = false
+    @ObservedObject var state: SessionRecordingPermissionState
 
     private let appName = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Fazm"
 
     var body: some View {
         VStack(spacing: 16) {
-            // Header with close button
-            HStack {
-                Image(systemName: "record.circle")
-                    .scaledFont(size: 16)
-                    .foregroundColor(FazmColors.purplePrimary)
-                Text("Enable Screen Recording")
-                    .scaledFont(size: 15, weight: .semibold)
-                    .foregroundColor(FazmColors.textPrimary)
+            if state.isGranted {
+                // Success state
                 Spacer()
-                Button(action: onDismiss) {
-                    Image(systemName: "xmark")
-                        .scaledFont(size: 12, weight: .medium)
-                        .foregroundColor(FazmColors.textTertiary)
-                        .frame(width: 24, height: 24)
-                        .background(FazmColors.backgroundTertiary.opacity(0.5))
-                        .clipShape(Circle())
+                Image(systemName: "checkmark.circle.fill")
+                    .scaledFont(size: 48)
+                    .foregroundColor(.green)
+                Text("Done")
+                    .scaledFont(size: 20, weight: .semibold)
+                    .foregroundColor(FazmColors.textPrimary)
+                Text("Screen recording is now enabled.")
+                    .scaledFont(size: 13)
+                    .foregroundColor(FazmColors.textSecondary)
+                Spacer()
+            } else {
+                // Header with close button
+                HStack {
+                    Image(systemName: "record.circle")
+                        .scaledFont(size: 16)
+                        .foregroundColor(FazmColors.purplePrimary)
+                    Text("Enable Screen Recording")
+                        .scaledFont(size: 15, weight: .semibold)
+                        .foregroundColor(FazmColors.textPrimary)
+                    Spacer()
+                    Button(action: onDismiss) {
+                        Image(systemName: "xmark")
+                            .scaledFont(size: 12, weight: .medium)
+                            .foregroundColor(FazmColors.textTertiary)
+                            .frame(width: 24, height: 24)
+                            .background(FazmColors.backgroundTertiary.opacity(0.5))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+
+                // Brief explanation
+                Text("Fazm needs screen recording to see what's on your screen and help you.")
+                    .scaledFont(size: 12)
+                    .foregroundColor(FazmColors.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 20)
+
+                // Tutorial GIF — same as permissions page
+                AnimatedGIFView(gifName: "permissions")
+                    .frame(maxWidth: 280, maxHeight: 180)
+                    .cornerRadius(10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(FazmColors.backgroundQuaternary, lineWidth: 1)
+                    )
+                    .padding(.horizontal, 20)
+
+                if state.hasClickedGrant {
+                    // Waiting state
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                        Text("Waiting for permission...")
+                            .scaledFont(size: 11)
+                            .foregroundColor(FazmColors.textTertiary)
+                    }
+                }
+
+                // Button
+                Button(action: {
+                    state.hasClickedGrant = true
+                    onGrantPermission()
+                }) {
+                    Text(state.hasClickedGrant ? "Open Settings Again" : "Open Settings")
+                        .scaledFont(size: 13, weight: .semibold)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(FazmColors.purplePrimary)
+                        )
                 }
                 .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 16)
-
-            // Brief explanation
-            Text("Fazm needs screen recording to see what's on your screen and help you.")
-                .scaledFont(size: 12)
-                .foregroundColor(FazmColors.textSecondary)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 20)
-
-            // Tutorial GIF — same as permissions page
-            AnimatedGIFView(gifName: "permissions")
-                .frame(maxWidth: 280, maxHeight: 180)
-                .cornerRadius(10)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(FazmColors.backgroundQuaternary, lineWidth: 1)
-                )
-                .padding(.horizontal, 20)
-
-            if hasClickedGrant {
-                // Waiting state
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .scaleEffect(0.7)
-                    Text("Waiting for permission...")
-                        .scaledFont(size: 11)
-                        .foregroundColor(FazmColors.textTertiary)
-                }
+                .padding(.bottom, 16)
             }
-
-            // Button
-            Button(action: {
-                hasClickedGrant = true
-                onGrantPermission()
-            }) {
-                Text(hasClickedGrant ? "Open Settings Again" : "Open Settings")
-                    .scaledFont(size: 13, weight: .semibold)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(FazmColors.purplePrimary)
-                    )
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 20)
-            .padding(.bottom, 16)
         }
+        .animation(.easeInOut(duration: 0.3), value: state.isGranted)
         .background(FazmColors.backgroundPrimary)
         .preferredColorScheme(.dark)
     }
@@ -95,6 +117,7 @@ final class SessionRecordingPermissionWindowController {
     static let shared = SessionRecordingPermissionWindowController()
     private var window: NSWindow?
     private var permissionCheckTimer: Timer?
+    private var state = SessionRecordingPermissionState()
     /// Prevent showing the prompt more than once per app session
     private var hasShownThisSession = false
 
@@ -124,6 +147,9 @@ final class SessionRecordingPermissionWindowController {
             return
         }
 
+        // Reset state for new prompt
+        state = SessionRecordingPermissionState()
+
         let controller = self
         let content = SessionRecordingPermissionSheet(
             onGrantPermission: {
@@ -138,7 +164,8 @@ final class SessionRecordingPermissionWindowController {
             },
             onDismiss: {
                 controller.close()
-            }
+            },
+            state: state
         )
 
         let hostingView = NSHostingView(rootView: AnyView(content))
@@ -188,10 +215,18 @@ final class SessionRecordingPermissionWindowController {
     private func startPermissionPolling(onGranted: @escaping () -> Void) {
         permissionCheckTimer?.invalidate()
         permissionCheckTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            guard let self else { return }
             if ScreenCaptureService.checkPermission() {
+                self.permissionCheckTimer?.invalidate()
+                self.permissionCheckTimer = nil
                 log("SessionRecordingPermission: permission granted!")
-                self?.close()
-                onGranted()
+
+                // Show "Done" state, then auto-close after 2 seconds
+                self.state.isGranted = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    self.close()
+                    onGranted()
+                }
             }
         }
     }
