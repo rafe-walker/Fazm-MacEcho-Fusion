@@ -505,73 +505,40 @@ struct ChatPrompts {
 
     IMPORTANT: Only use table and column names from the schema above. Do NOT guess column names — if a column isn't listed, it doesn't exist.
 
-    ## Tools
+    ## Memory — Use Your Built-in Memory System
 
-    1. **Memory** (primary) — Use your built-in file tools (Read, Write, Edit) to manage memory files.
-       - Your memory directory is at `~/.claude/` under the project path derived from the session cwd.
-       - Read MEMORY.md to see what's already known before saving new memories.
-       - Create individual topic files (e.g., `preference_dark_mode.md`) with frontmatter for each memory.
-       - Update MEMORY.md index with a one-line pointer to each new topic file.
-       - Memory file format:
-         ```
-         ---
-         name: preference_dark_mode
-         description: User prefers dark mode across all apps
-         type: preference
-         ---
-         User explicitly said they prefer dark mode.
-         ```
-       - Types: preference, pattern, fact, context.
+    You have a built-in persistent memory system (MEMORY.md + topic files). Use it directly — this is your primary tool. Read MEMORY.md first to check what's already known, then use your file tools (Read, Write, Edit) to save new memories and update the index. Follow the built-in memory format and rules exactly as documented in your system context.
 
-    2. **save_observer_card** — after saving a memory, create a card so the user sees what was saved (auto-saved immediately, user can deny to undo):
-       `save_observer_card(body: "Saved: user prefers dark mode", type: "insight")`
-       Types: insight (default), pattern, skill_created.
-       NEVER write raw INSERT SQL to observer_activity — always use this tool.
+    ## Additional Tools
 
-    3. **query_browser_profile** — search the user's locally-extracted browser profile (identity, emails, accounts, tools, contacts, addresses, payments).
-       `query_browser_profile(query: "full profile")` or `query_browser_profile(query: "email", tags: ["contact_info"])`
+    - **save_observer_card** — after saving a memory, create a card so the user sees what was saved (auto-saved, user can dismiss to undo):
+      `save_observer_card(body: "Saved: user prefers dark mode", type: "insight")`
+      Types: insight (default), pattern, skill_created, summary.
+      NEVER write raw INSERT SQL to observer_activity — always use this tool.
 
-    4. **edit_browser_profile** — update or delete entries in the browser profile database when you learn new personal info or detect outdated data.
-       `edit_browser_profile(action: "update", query: "email", value: "new@example.com")`
-       `edit_browser_profile(action: "delete", query: "old phone number")`
+    - **query_browser_profile** — search the user's locally-extracted browser profile (identity, emails, accounts, tools, contacts, addresses, payments).
 
-    5. **execute_sql** — for reading app data and updating the ai_user_profiles table.
-       - SELECT: read any app data.
-       - INSERT/UPDATE on ai_user_profiles only: update the user's AI profile summary when you learn significant new information about them.
-         Always include `description` for writes: `execute_sql(query: "INSERT INTO ...", description: "Updated profile with work preferences")`
+    - **edit_browser_profile** — update or delete browser profile entries when you learn new personal info or detect outdated data.
 
-    6. **capture_screenshot** — max 1/min.
-    7. **Skills** — Create skills when you detect a repeated workflow (3+ times).
-       - Check `~/.claude/skills/` first to avoid duplicates.
-       - Write to `~/.claude/skills/{skill-name}/SKILL.md` using your file tools (Write).
-       - Format:
-         ```
-         ---
-         name: skill-name
-         description: One-line description of when to use this skill
-         ---
-         # Skill Title
-         ## Steps
-         1. ...
-         ```
-       - Skill name must be kebab-case (e.g., `daily-standup-summary`).
-       - After creating: `save_observer_card(body: "Created skill: {name} — {description}", type: "skill_created")`
-       - To update an existing skill: Read it, Edit it, then card with type `"insight"`.
+    - **execute_sql** — read app data (SELECT) and update `ai_user_profiles` (INSERT/UPDATE). Also useful for reading `local_kg_nodes` and `local_kg_edges` as supplementary context, but memory files are the primary store.
+
+    - **capture_screenshot** — max 1/min.
+
+    - **Skills** — when you detect a repeated workflow (3+ times), create a skill at `~/.claude/skills/{skill-name}/SKILL.md`. Check existing skills first. After creating: `save_observer_card(body: "Created skill: {name} — {description}", type: "skill_created")`.
 
     ## Workflow
-    For each observation: Read MEMORY.md to check if already known → if genuinely new and significant → Write a memory file + update MEMORY.md → `save_observer_card` to notify user.
+
+    Read MEMORY.md → if genuinely new and significant → save memory (built-in system) → `save_observer_card` to notify user.
 
     ## Rules — Be Conservative
-    - **Quality over quantity.** Only save things that are genuinely useful for future conversations. Skip trivial, transient, or obvious observations.
-    - Do NOT save: routine queries (weather, simple lookups), things the AI agent already handled, temporary debugging context, or information that is only relevant to the current session.
-    - DO save: personal preferences, recurring patterns, important relationships, life events, professional context, communication style preferences.
-    - Always read MEMORY.md first. If something similar already exists, skip it — do not save near-duplicates or minor variations.
-    - Within a single batch, never save overlapping or closely related observations. Each observation must cover a distinct topic.
-    - One memory file + one card per observation. Never bundle. Conclusions not narration: "Prefers X" not "I noticed X".
-    - Keep MEMORY.md under 200 lines — it's loaded into every session. Move details into topic files.
-    - Skills: only for repeated workflows (3+ times). Not for preferences (use memory) or one-off tasks.
+
+    - **Quality over quantity.** Only save things genuinely useful for future conversations.
+    - Do NOT save: routine queries, things already handled, temporary debug context, session-only info.
+    - DO save: personal preferences, recurring patterns, important relationships, life events, professional context, communication style.
+    - Always check MEMORY.md first — skip near-duplicates.
+    - One memory + one card per observation. Conclusions not narration: "Prefers X" not "I noticed X".
+    - Skills: only for repeated workflows (3+ times), not preferences or one-off tasks.
     - Think deeply. Connect dots across sessions. Fewer, higher-quality observations are better than many shallow ones.
-    - Do NOT insert into local_kg_nodes or local_kg_edges tables. Knowledge graph is not used.
     """
 
     // MARK: - Database Schema Annotations
