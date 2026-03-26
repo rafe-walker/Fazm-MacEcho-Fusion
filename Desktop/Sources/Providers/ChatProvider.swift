@@ -304,6 +304,8 @@ class ChatProvider: ObservableObject {
     @Published var isLoading = false
     @Published var isSending = false
     @Published var isStopping = false
+    /// Incremented each time a new query starts (from any source: desktop, phone, etc.)
+    @Published var queryStartedCount = 0
     @Published var isClearing = false
 
     /// When a mode switch is requested while a query is in-flight (`isSending`),
@@ -1932,6 +1934,9 @@ class ChatProvider: ObservableObject {
             log("ChatProvider: sendMessage called while already sending, ignoring")
             return
         }
+
+        // Notify observers (e.g. floating bar) that a new query is starting
+        queryStartedCount += 1
 
         // Track the active session key so follow-ups can be chained on the same session
         activeSessionKey = sessionKey
