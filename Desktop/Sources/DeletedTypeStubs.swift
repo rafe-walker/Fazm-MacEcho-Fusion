@@ -708,7 +708,6 @@ class ProactiveAssistantsPlugin {
     func openScreenRecordingPreferences() {
         ScreenCaptureService.openScreenRecordingPreferences()
     }
-    static func repairNotificationRegistration() {}
 }
 
 /// Stub actor for focus assistant to satisfy async member access
