@@ -1,6 +1,6 @@
 use axum::{
     extract::Extension,
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Json},
 };
 use serde::{Deserialize, Serialize};
@@ -8,6 +8,30 @@ use std::sync::Arc;
 
 use crate::config::Config;
 use crate::firestore::{self, ReleaseDoc};
+
+/// Validate the shared release secret from the Authorization header.
+fn validate_release_secret(headers: &HeaderMap, config: &Config) -> Result<(), StatusCode> {
+    if config.release_secret.is_empty() {
+        tracing::error!("RELEASE_SECRET not configured on backend");
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    let auth_header = headers
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    if !auth_header.starts_with("Bearer ") {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    let token = &auth_header[7..];
+    if token != config.release_secret {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    Ok(())
+}
 
 // ─── Channel progression ──────────────────────────────────────────────────────
 
@@ -84,9 +108,13 @@ pub struct RegisterResponse {
 /// Called by Codemagic after a successful build to register the release in Firestore.
 /// New releases always start on the "staging" channel.
 pub async fn register(
+    headers: HeaderMap,
     Extension(config): Extension<Arc<Config>>,
     Json(req): Json<RegisterRequest>,
 ) -> impl IntoResponse {
+    if let Err(status) = validate_release_secret(&headers, &config) {
+        return (status, Json(serde_json::json!({"error": "unauthorized"}))).into_response();
+    }
     let token = match firestore::get_access_token(&config).await {
         Ok(t) => t,
         Err(e) => {
@@ -154,9 +182,13 @@ pub struct PromoteResponse {
 /// PATCH /api/releases/promote
 /// Advances the release one step up the channel ladder: staging → beta → stable.
 pub async fn promote(
+    headers: HeaderMap,
     Extension(config): Extension<Arc<Config>>,
     Json(req): Json<PromoteRequest>,
 ) -> impl IntoResponse {
+    if let Err(status) = validate_release_secret(&headers, &config) {
+        return (status, Json(serde_json::json!({"error": "unauthorized"}))).into_response();
+    }
     let token = match firestore::get_access_token(&config).await {
         Ok(t) => t,
         Err(e) => {
