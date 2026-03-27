@@ -139,6 +139,13 @@ class ChatToolExecutor {
         sanitized = sanitized.replacingOccurrences(of: "\\'", with: "''")
         sanitized = sanitized.replacingOccurrences(of: "\\\"", with: "\"")
 
+        // FTS5 tables don't support `docid` (FTS3/FTS4 only) — rewrite to `rowid`
+        sanitized = sanitized.replacingOccurrences(
+            of: "\\bdocid\\b",
+            with: "rowid",
+            options: .regularExpression
+        )
+
         var upper = sanitized.uppercased()
 
         // Block dangerous keywords
