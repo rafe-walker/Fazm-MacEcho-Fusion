@@ -676,7 +676,8 @@ struct OnboardingChatView: View {
         // Set flag so DesktopHomeView navigates to Chat page after transition
         UserDefaults.standard.set(true, forKey: "onboardingJustCompleted")
 
-        // Mark onboarding as done
+        // Mark onboarding as done (clear skipped flag if it was set from a previous skip)
+        UserDefaults.standard.removeObject(forKey: "onboardingWasSkipped")
         appState.hasCompletedOnboarding = true
         UserDefaults.standard.set(true, forKey: "hasCompletedFileIndexing")
 
