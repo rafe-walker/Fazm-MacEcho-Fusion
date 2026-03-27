@@ -37,7 +37,118 @@ class FounderChatService: ObservableObject {
     private var pollingTask: Task<Void, Never>?
     private var lastPollTime: Date?
 
-    private init() {}
+    private init() {
+        setupTestNotificationListener()
+    }
+
+    // MARK: - Programmatic Test Hook
+
+    /// Listen for distributed notification to send a test message from the terminal:
+    /// ```
+    /// xcrun swift -e 'import Foundation; DistributedNotificationCenter.default().postNotificationName(.init("com.fazm.founderChat"), object: nil, userInfo: ["text": "Hello from terminal!"], deliverImmediately: true); RunLoop.current.run(until: Date(timeIntervalSinceNow: 1.0))'
+    /// ```
+    /// Simulate receiving a founder message:
+    /// ```
+    /// xcrun swift -e 'import Foundation; DistributedNotificationCenter.default().postNotificationName(.init("com.fazm.founderChat"), object: nil, userInfo: ["text": "Reply from founder", "sender": "founder", "senderName": "Matt"], deliverImmediately: true); RunLoop.current.run(until: Date(timeIntervalSinceNow: 1.0))'
+    /// ```
+    private func setupTestNotificationListener() {
+        DistributedNotificationCenter.default().addObserver(
+            forName: NSNotification.Name("com.fazm.founderChat"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let userInfo = notification.userInfo,
+                  let text = userInfo["text"] as? String else { return }
+            let sender = userInfo["sender"] as? String ?? "user"
+            let senderName = userInfo["senderName"] as? String
+
+            log("FounderChatService: Test notification received — sender=\(sender), text=\(text)")
+
+            Task { @MainActor [weak self] in
+                if sender == "founder" {
+                    // Simulate receiving a founder message (write to Firestore as founder)
+                    await self?.simulateFounderMessage(text: text, senderName: senderName ?? "Matt")
+                } else {
+                    // Send as user message
+                    await self?.sendMessage(text)
+                }
+            }
+        }
+    }
+
+    /// Write a founder message to Firestore (for testing the receive path)
+    private func simulateFounderMessage(text: String, senderName: String) async {
+        guard let uid = AuthService.shared.userId,
+              let idToken = try? await AuthService.shared.getIdToken() else {
+            log("FounderChatService: simulateFounderMessage — not signed in")
+            return
+        }
+
+        let messageId = UUID().uuidString
+        let now = ISO8601DateFormatter().string(from: Date())
+
+        let msgDocPath = "\(Self.baseUrl)/founder_chats/\(uid)/messages/\(messageId)?updateMask.fieldPaths=text&updateMask.fieldPaths=sender&updateMask.fieldPaths=sender_name&updateMask.fieldPaths=created_at&updateMask.fieldPaths=read"
+        let msgFields: [String: Any] = [
+            "text": ["stringValue": text],
+            "sender": ["stringValue": "founder"],
+            "sender_name": ["stringValue": senderName],
+            "created_at": ["timestampValue": now],
+            "read": ["booleanValue": false],
+        ]
+
+        var request = URLRequest(url: URL(string: msgDocPath)!)
+        request.httpMethod = "PATCH"
+        request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["fields": msgFields])
+
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            if let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) {
+                log("FounderChatService: simulateFounderMessage success")
+                // Update metadata to increment unread_by_user
+                let commitUrl = "https://firestore.googleapis.com/v1/projects/\(Self.firestoreProjectId)/databases/(default)/documents:commit"
+                let docPath = "projects/\(Self.firestoreProjectId)/databases/(default)/documents/founder_chats/\(uid)"
+                let writes: [[String: Any]] = [
+                    [
+                        "update": [
+                            "name": docPath,
+                            "fields": [
+                                "last_message_text": ["stringValue": String(text.prefix(100))],
+                                "last_message_at": ["timestampValue": now],
+                                "last_message_sender": ["stringValue": "founder"],
+                            ],
+                        ] as [String: Any],
+                        "updateMask": ["fieldPaths": ["last_message_text", "last_message_at", "last_message_sender"]],
+                    ],
+                    [
+                        "transform": [
+                            "document": docPath,
+                            "fieldTransforms": [
+                                ["fieldPath": "unread_by_user", "increment": ["integerValue": "1"]],
+                            ],
+                        ] as [String: Any],
+                    ],
+                ]
+                let body: [String: Any] = ["writes": writes]
+                var metaReq = URLRequest(url: URL(string: commitUrl)!)
+                metaReq.httpMethod = "POST"
+                metaReq.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
+                metaReq.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                metaReq.httpBody = try? JSONSerialization.data(withJSONObject: body)
+                _ = try? await URLSession.shared.data(for: metaReq)
+
+                // Trigger immediate poll to show the message
+                await fetchMessages()
+                await fetchUnreadCount()
+            } else {
+                let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+                log("FounderChatService: simulateFounderMessage failed (status \(code))")
+            }
+        } catch {
+            log("FounderChatService: simulateFounderMessage failed: \(error)")
+        }
+    }
 
     // MARK: - Lifecycle
 
