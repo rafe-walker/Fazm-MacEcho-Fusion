@@ -12,44 +12,51 @@ struct SettingsPage: View {
     var chatProvider: ChatProvider? = nil
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(spacing: 0) {
-                    // Section header
-                    HStack {
-                        Text(selectedSection == .advanced && selectedAdvancedSubsection != nil
-                             ? selectedAdvancedSubsection!.rawValue
-                             : selectedSection.rawValue)
-                            .scaledFont(size: 28, weight: .bold)
-                            .foregroundColor(FazmColors.textPrimary)
-                            .id(selectedSection)
-                            .transition(.opacity)
-                            .animation(.easeInOut(duration: 0.15), value: selectedSection)
+        Group {
+            if selectedSection == .chatWithUs {
+                // Chat page fills the entire content area (no header/scroll wrapper)
+                FounderChatPage()
+            } else {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            // Section header
+                            HStack {
+                                Text(selectedSection == .advanced && selectedAdvancedSubsection != nil
+                                     ? selectedAdvancedSubsection!.rawValue
+                                     : selectedSection.rawValue)
+                                    .scaledFont(size: 28, weight: .bold)
+                                    .foregroundColor(FazmColors.textPrimary)
+                                    .id(selectedSection)
+                                    .transition(.opacity)
+                                    .animation(.easeInOut(duration: 0.15), value: selectedSection)
 
-                        Spacer()
+                                Spacer()
+                            }
+                            .padding(.horizontal, 32)
+                            .padding(.top, 32)
+                            .padding(.bottom, 24)
+
+                            // Settings content - embedded SettingsView with dark theme override
+                            SettingsContentView(
+                                appState: appState,
+                                selectedSection: $selectedSection,
+                                selectedAdvancedSubsection: $selectedAdvancedSubsection,
+                                highlightedSettingId: $highlightedSettingId,
+                                chatProvider: chatProvider
+                            )
+                            .padding(.horizontal, 32)
+
+                            Spacer()
+                        }
                     }
-                    .padding(.horizontal, 32)
-                    .padding(.top, 32)
-                    .padding(.bottom, 24)
-
-                    // Settings content - embedded SettingsView with dark theme override
-                    SettingsContentView(
-                        appState: appState,
-                        selectedSection: $selectedSection,
-                        selectedAdvancedSubsection: $selectedAdvancedSubsection,
-                        highlightedSettingId: $highlightedSettingId,
-                        chatProvider: chatProvider
-                    )
-                    .padding(.horizontal, 32)
-
-                    Spacer()
-                }
-            }
-            .onChange(of: highlightedSettingId) { _, newId in
-                guard let newId = newId else { return }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        proxy.scrollTo(newId, anchor: .center)
+                    .onChange(of: highlightedSettingId) { _, newId in
+                        guard let newId = newId else { return }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                proxy.scrollTo(newId, anchor: .center)
+                            }
+                        }
                     }
                 }
             }
@@ -130,6 +137,7 @@ struct SettingsContentView: View {
 
     enum SettingsSection: String, CaseIterable {
         case home = "Home"
+        case chatWithUs = "Chat with Us"
         case discoveredTasks = "Discovered Tasks"
         case remoteControl = "Remote Control"
         case dictionary = "Dictionary"
@@ -179,6 +187,8 @@ struct SettingsContentView: View {
                 switch selectedSection {
                 case .home:
                     HomeSection(appState: appState)
+                case .chatWithUs:
+                    FounderChatPage()
                 case .discoveredTasks:
                     DiscoveredTasksSection()
                 case .remoteControl:
