@@ -178,7 +178,7 @@ struct SettingsContentView: View {
             Group {
                 switch selectedSection {
                 case .home:
-                    HomeSection()
+                    HomeSection(appState: appState)
                 case .discoveredTasks:
                     DiscoveredTasksSection()
                 case .remoteControl:
