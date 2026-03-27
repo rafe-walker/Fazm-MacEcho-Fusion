@@ -23,7 +23,7 @@ extension UserDefaults {
 // MARK: - Content Block Model
 
 /// Structured tool input for inline display
-struct ToolCallInput {
+struct ToolCallInput: Equatable {
     /// Short summary for inline display (e.g., file path, command)
     let summary: String
     /// Full JSON details for expanded view
@@ -31,14 +31,14 @@ struct ToolCallInput {
 }
 
 /// Button for observer cards
-struct ObserverCardButton: Identifiable {
+struct ObserverCardButton: Identifiable, Equatable {
     let id: String
     let label: String
     let action: String  // "approve", "dismiss", "edit"
 }
 
 /// A block of content within an AI message (text or tool call indicator)
-enum ChatContentBlock: Identifiable {
+enum ChatContentBlock: Identifiable, Equatable {
     case text(id: String, text: String)
     case toolCall(id: String, name: String, status: ToolCallStatus,
                   toolUseId: String? = nil,
@@ -177,7 +177,7 @@ enum ChatContentBlock: Identifiable {
     }
 }
 
-enum ToolCallStatus {
+enum ToolCallStatus: Equatable {
     case running
     case completed
 }
@@ -185,7 +185,7 @@ enum ToolCallStatus {
 // MARK: - Chat Message Model
 
 /// A single chat message
-struct ChatMessage: Identifiable {
+struct ChatMessage: Identifiable, Equatable {
     var id: String  // Mutable to sync with server-generated ID
     var text: String
     let createdAt: Date
@@ -200,6 +200,15 @@ struct ChatMessage: Identifiable {
     /// Structured content blocks for AI messages (text interspersed with tool calls)
     var contentBlocks: [ChatContentBlock]
 
+    static func == (lhs: ChatMessage, rhs: ChatMessage) -> Bool {
+        lhs.id == rhs.id
+            && lhs.text == rhs.text
+            && lhs.isStreaming == rhs.isStreaming
+            && lhs.rating == rhs.rating
+            && lhs.isSynced == rhs.isSynced
+            && lhs.contentBlocks == rhs.contentBlocks
+    }
+
     init(id: String = UUID().uuidString, text: String, createdAt: Date = Date(), sender: ChatSender, isStreaming: Bool = false, rating: Int? = nil, isSynced: Bool = false, citations: [Citation] = [], contentBlocks: [ChatContentBlock] = []) {
         self.id = id
         self.text = text
@@ -213,7 +222,7 @@ struct ChatMessage: Identifiable {
     }
 }
 
-enum ChatSender {
+enum ChatSender: Equatable {
     case user
     case ai
 }
