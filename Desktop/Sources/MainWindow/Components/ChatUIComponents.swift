@@ -4,12 +4,22 @@ import MarkdownUI
 // MARK: - Content Block Grouping
 
 /// Groups consecutive content blocks of the same type for rendering
-enum ContentBlockGroup: Identifiable {
+enum ContentBlockGroup: Identifiable, Equatable {
     case text(id: String, text: String)
-    case toolCalls(id: String, calls: [(name: String, status: ToolCallStatus, toolUseId: String?, input: ToolCallInput?, output: String?)])
+    case toolCalls(id: String, calls: [ToolCallGroupItem])
     case thinking(id: String, text: String)
     case discoveryCard(id: String, title: String, summary: String, fullText: String)
     case observerCard(id: String, activityId: Int64, type: String, content: String, buttons: [ObserverCardButton], actedAction: String? = nil)
+
+/// Equatable wrapper for tool call data in a group.
+struct ToolCallGroupItem: Equatable, Identifiable {
+    var id: String { toolUseId ?? name }
+    let name: String
+    let status: ToolCallStatus
+    let toolUseId: String?
+    let input: ToolCallInput?
+    let output: String?
+}
 
     var id: String {
         switch self {
