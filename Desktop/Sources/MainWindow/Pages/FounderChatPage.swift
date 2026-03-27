@@ -45,7 +45,7 @@ struct FounderChatPage: View {
                     .foregroundColor(FazmColors.textTertiary)
             }
 
-            Text("Chat with the Fazm team")
+            Text("Chat with the founder")
                 .scaledFont(size: 20, weight: .semibold)
                 .foregroundColor(FazmColors.textPrimary)
 
