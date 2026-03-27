@@ -961,6 +961,12 @@ actor ACPBridge {
       return pendingMessages.removeFirst()
     }
 
+    // If the bridge is no longer running (e.g., stop() was called during a tool call),
+    // throw immediately rather than creating a continuation that would never be resumed.
+    guard isRunning else {
+      throw BridgeError.stopped
+    }
+
     messageGeneration &+= 1
     let expectedGeneration = messageGeneration
 
