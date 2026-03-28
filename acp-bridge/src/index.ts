@@ -783,6 +783,9 @@ function buildMcpServers(mode: string, cwd?: string, sessionKey?: string): McpSe
         // redirects stdlib resolution to the bundled .venv which contains the
         // actual lib/python3.12 directory and site-packages.
         { name: "PYTHONHOME", value: googleWorkspaceMcpVenv },
+        // Prevent Python from writing .pyc files into the app bundle, which
+        // invalidates the code signature and breaks Sparkle auto-updates.
+        { name: "PYTHONDONTWRITEBYTECODE", value: "1" },
         // Point to user-writable credential paths (the app bundle is read-only).
         // The google-cloud-oauth-setup skill stores client_secret.json here after
         // the user creates their personal Google Cloud OAuth app.

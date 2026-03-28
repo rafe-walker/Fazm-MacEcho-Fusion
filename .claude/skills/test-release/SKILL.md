@@ -79,6 +79,7 @@ Report a summary table:
 
 ## What Counts as a Failure
 
+- **Sparkle update fails** — this is a hard failure. Do NOT work around it with manual ZIP install. If Sparkle can't update, the test fails. Common cause: broken code signature from `__pycache__` files written inside the app bundle.
 - App doesn't update (Sparkle error, appcast not serving correct version)
 - Query gets no AI response within 60 seconds
 - Logs show `error`, `crash`, `unauthorized`, `401`, or `failed` during the query
