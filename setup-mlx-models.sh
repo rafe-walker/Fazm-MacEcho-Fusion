@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# setup-mlx-models.sh — Download MLX models for the Fazm + MacEcho Fusion voice engine
+# setup-mlx-models.sh — Download MLX models for Fazm + MacEcho Fusion
 #
 
 set -euo pipefail
@@ -11,36 +11,23 @@ echo "║  All models run locally on your M3 MacBook Pro via Apple MLX    ║"
 echo "╚══════════════════════════════════════════════════════════════════╝"
 echo ""
 
-# Find huggingface-cli — check common install locations
-HF_CLI=""
-for candidate in \
-    "$(python3 -m site --user-base 2>/dev/null)/bin/huggingface-cli" \
-    "$HOME/Library/Python/3.9/bin/huggingface-cli" \
-    "$HOME/Library/Python/3.10/bin/huggingface-cli" \
-    "$HOME/Library/Python/3.11/bin/huggingface-cli" \
-    "$HOME/Library/Python/3.12/bin/huggingface-cli" \
-    "$HOME/Library/Python/3.13/bin/huggingface-cli" \
-    "$(which huggingface-cli 2>/dev/null)" \
-    ; do
-    if [ -x "$candidate" ] 2>/dev/null; then
-        HF_CLI="$candidate"
-        break
-    fi
-done
-
-if [ -z "$HF_CLI" ]; then
-    echo "Installing huggingface-hub CLI..."
+# Ensure huggingface_hub is installed
+python3 -c "import huggingface_hub" 2>/dev/null || {
+    echo "Installing huggingface-hub..."
     pip3 install --user huggingface-hub 2>&1 | tail -3
-    # Re-find after install
-    HF_CLI="$(python3 -m site --user-base 2>/dev/null)/bin/huggingface-cli"
-    if [ ! -x "$HF_CLI" ]; then
-        echo "ERROR: Could not find huggingface-cli after install."
-        echo "Try: export PATH=\"\$HOME/Library/Python/3.9/bin:\$PATH\" and re-run."
-        exit 1
-    fi
-fi
+}
 
-echo "Using: $HF_CLI"
+# Use python3 -m to call it — avoids all PATH issues
+HF="python3 -m huggingface_hub.commands.huggingface_cli"
+
+# Verify it works
+$HF version >/dev/null 2>&1 || {
+    echo "ERROR: huggingface_hub installed but CLI not working."
+    echo "Try: pip3 install --user --upgrade huggingface-hub"
+    exit 1
+}
+
+echo "Using: $HF"
 echo ""
 
 CACHE_DIR="${HOME}/.cache/huggingface/hub"
@@ -55,7 +42,7 @@ download_model() {
         echo "  ✓ ${display_name} (${repo_id}) — already cached"
     else
         echo "  ↓ Downloading ${display_name} (${repo_id})..."
-        "$HF_CLI" download "$repo_id" --quiet
+        $HF download "$repo_id" --quiet
         echo "  ✓ ${display_name} downloaded"
     fi
 }
