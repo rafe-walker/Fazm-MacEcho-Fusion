@@ -12,6 +12,7 @@ import Foundation
 import MLX
 import MLXAudioCore
 import MLXAudioTTS
+import MLXLMCommon
 
 /// Text-to-Speech engine using MLX-native models.
 /// Supports streaming audio generation for low-latency playback.
@@ -70,7 +71,7 @@ actor MLXTTSEngine {
                 refAudio: nil,
                 refText: nil,
                 language: "en",
-                generationParameters: AudioGenerateParameters(maxTokens: 50)
+                generationParameters: GenerateParameters(maxTokens: 50, temperature: 0.6)
             )
             mlxLog("[TTS] Warm-up complete")
         } catch {
@@ -94,7 +95,7 @@ actor MLXTTSEngine {
             refAudio: nil,
             refText: nil,
             language: nil,
-            generationParameters: AudioGenerateParameters(
+            generationParameters: GenerateParameters(
                 maxTokens: config.maxTokens,
                 temperature: config.temperature
             )
@@ -125,7 +126,7 @@ actor MLXTTSEngine {
             refAudio: nil,
             refText: nil,
             language: nil,
-            generationParameters: AudioGenerateParameters(
+            generationParameters: GenerateParameters(
                 maxTokens: config.maxTokens,
                 temperature: config.temperature
             ),
@@ -204,7 +205,7 @@ actor MLXTTSEngine {
         }
 
         player.play()
-        player.scheduleBuffer(buffer)
+        await player.scheduleBuffer(buffer)
 
         // Wait for playback to complete
         let duration = Double(samples.count) / Double(sampleRate)
@@ -237,7 +238,7 @@ actor MLXTTSEngine {
         if !player.isPlaying {
             player.play()
         }
-        player.scheduleBuffer(buffer)
+        await player.scheduleBuffer(buffer)
     }
 }
 

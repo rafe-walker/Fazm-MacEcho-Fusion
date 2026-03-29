@@ -1,10 +1,9 @@
 //
 //  MLXASREngine.swift
-//  Fazm — ASR via mlx-audio-swift (SenseVoice or Qwen3-ASR)
+//  Fazm — ASR via mlx-audio-swift (Qwen3-ASR)
 //
 //  Ported from MacEcho's sencevoice/model.py.
-//  Primary: SenseVoice (multi-lingual, emotion/event detection).
-//  Fallback: Qwen3-ASR (if SenseVoice model isn't available).
+//  Uses Qwen3-ASR (SenseVoice is not available in current mlx-audio-swift).
 //
 
 import Foundation
@@ -14,7 +13,6 @@ import MLXAudioSTT
 
 /// Which ASR model to use.
 enum ASRModelType: String, Codable, Sendable {
-    case senseVoice = "senseVoice"
     case qwen3ASR = "qwen3ASR"
 }
 
@@ -24,8 +22,7 @@ actor MLXASREngine {
 
     // MARK: - State
 
-    private var senseVoiceModel: SenseVoiceModel?
-    private var genericSTTModel: (any STTGenerationModel)?
+    private var model: Qwen3ASRModel?
     private let config: MLXVoiceEngineConfig.ASRConfig
     private var activeModelType: ASRModelType?
     private var isLoading = false
@@ -39,7 +36,7 @@ actor MLXASREngine {
 
     // MARK: - Model Loading
 
-    /// Load the ASR model. Tries SenseVoice first, falls back to Qwen3-ASR.
+    /// Load the ASR model (Qwen3-ASR).
     func loadModel() async throws {
         guard !isLoading && !isReady else { return }
         isLoading = true
@@ -47,63 +44,30 @@ actor MLXASREngine {
 
         let startTime = CFAbsoluteTimeGetCurrent()
 
-        // Try SenseVoice first (preferred — matches MacEcho pipeline)
-        if config.modelID.lowercased().contains("sensevoice") {
-            do {
-                mlxLog("[ASR] Loading SenseVoice: \(config.modelID)")
-                let model = try await SenseVoiceModel.fromPretrained(config.modelID)
-                self.senseVoiceModel = model
-                self.activeModelType = .senseVoice
-                isReady = true
-                let elapsed = CFAbsoluteTimeGetCurrent() - startTime
-                mlxLog("[ASR] SenseVoice loaded in \(String(format: "%.2f", elapsed))s")
-                return
-            } catch {
-                mlxLog("[ASR] SenseVoice load failed: \(error). Falling back to Qwen3-ASR.")
-            }
-        }
+        let modelID = config.modelID.lowercased().contains("sensevoice")
+            ? "mlx-community/Qwen3-ASR-1.7B-bf16"  // SenseVoice not available, use Qwen3-ASR
+            : config.modelID
 
-        // Fallback: Qwen3-ASR
-        let fallbackID = "mlx-community/Qwen3-ASR-1.7B-bf16"
-        mlxLog("[ASR] Loading Qwen3-ASR: \(fallbackID)")
-        do {
-            let model = try await Qwen3ASRModel.fromPretrained(fallbackID)
-            self.genericSTTModel = model
-            self.activeModelType = .qwen3ASR
-            isReady = true
-            let elapsed = CFAbsoluteTimeGetCurrent() - startTime
-            mlxLog("[ASR] Qwen3-ASR loaded in \(String(format: "%.2f", elapsed))s")
-        } catch {
-            mlxLog("[ASR] Qwen3-ASR also failed: \(error)")
-            throw error
-        }
+        mlxLog("[ASR] Loading Qwen3-ASR: \(modelID)")
+        let loadedModel = try await Qwen3ASRModel.fromPretrained(modelID)
+        self.model = loadedModel
+        self.activeModelType = .qwen3ASR
+        isReady = true
+
+        let elapsed = CFAbsoluteTimeGetCurrent() - startTime
+        mlxLog("[ASR] Qwen3-ASR loaded in \(String(format: "%.2f", elapsed))s")
     }
 
     /// Warm up the model with a short dummy input.
     func warmUp() async {
-        guard isReady else { return }
-        mlxLog("[ASR] Warming up \(activeModelType?.rawValue ?? "unknown")...")
+        guard isReady, let model else { return }
+        mlxLog("[ASR] Warming up Qwen3-ASR...")
         let silenceSamples = [Float](repeating: 0.0, count: 16_000)
         let audioArray = MLXArray(silenceSamples)
-
-        switch activeModelType {
-        case .senseVoice:
-            if let model = senseVoiceModel {
-                _ = model.generate(
-                    audio: audioArray,
-                    generationParameters: STTGenerateParameters()
-                )
-            }
-        case .qwen3ASR:
-            if let model = genericSTTModel {
-                _ = model.generate(
-                    audio: audioArray,
-                    generationParameters: STTGenerateParameters()
-                )
-            }
-        case nil:
-            break
-        }
+        _ = model.generate(
+            audio: audioArray,
+            generationParameters: STTGenerateParameters()
+        )
         mlxLog("[ASR] Warm-up complete")
     }
 
@@ -111,49 +75,26 @@ actor MLXASREngine {
 
     /// Transcribe a speech segment (raw Float32 PCM @ 16 kHz).
     func transcribe(audioSamples: [Float]) async throws -> ASRResult? {
-        guard isReady else {
+        guard isReady, let model else {
             mlxLog("[ASR] Model not ready, skipping transcription")
             return nil
         }
 
         let startTime = CFAbsoluteTimeGetCurrent()
         let audioArray = MLXArray(audioSamples)
-        var text = ""
-        var language: String?
 
-        switch activeModelType {
-        case .senseVoice:
-            if let model = senseVoiceModel {
-                let output = model.generate(
-                    audio: audioArray,
-                    generationParameters: STTGenerateParameters(
-                        language: config.language == "auto" ? nil : config.language
-                    )
-                )
-                text = output.text
-                language = output.language
-            }
-
-        case .qwen3ASR:
-            if let model = genericSTTModel {
-                let output = model.generate(
-                    audio: audioArray,
-                    generationParameters: STTGenerateParameters(
-                        language: config.language == "auto" ? nil : config.language
-                    )
-                )
-                text = output.text
-                language = output.language
-            }
-
-        case nil:
-            return nil
-        }
+        let lang = (config.language == "auto") ? "English" : config.language
+        let output = model.generate(
+            audio: audioArray,
+            generationParameters: STTGenerateParameters(language: lang)
+        )
+        let text = output.text
+        let language = output.language
 
         let elapsed = CFAbsoluteTimeGetCurrent() - startTime
         let audioDuration = Double(audioSamples.count) / 16_000.0
 
-        mlxLog("[ASR] [\(activeModelType?.rawValue ?? "?")] Transcribed \(String(format: "%.1f", audioDuration))s → \(String(format: "%.3f", elapsed))s: \"\(text.prefix(80))\"")
+        mlxLog("[ASR] Transcribed \(String(format: "%.1f", audioDuration))s → \(String(format: "%.3f", elapsed))s: \"\(text.prefix(80))\"")
 
         return ASRResult(
             text: text,
@@ -161,7 +102,7 @@ actor MLXASREngine {
             confidence: 1.0,
             audioDuration: audioDuration,
             processingTime: elapsed,
-            modelType: activeModelType ?? .senseVoice
+            modelType: activeModelType ?? .qwen3ASR
         )
     }
 
@@ -179,4 +120,3 @@ struct ASRResult: Sendable {
     let processingTime: Double
     let modelType: ASRModelType
 }
-

@@ -56,7 +56,6 @@ actor MLXLLMEngine {
     func warmUp() async {
         guard isReady else { return }
         mlxLog("[LLM] Warming up Qwen...")
-        // Generate a short response to prime caches
         var discarded = ""
         for await token in generateStream(prompt: "Hi", skipContext: true) {
             discarded += token
@@ -68,7 +67,7 @@ actor MLXLLMEngine {
     // MARK: - Generation
 
     /// Generate a streaming response for the given user prompt.
-    /// Yields individual tokens as they are generated.
+    /// Yields individual text chunks as they are generated.
     func generateStream(prompt: String, skipContext: Bool = false) -> AsyncStream<String> {
         AsyncStream { continuation in
             Task {
@@ -84,7 +83,6 @@ actor MLXLLMEngine {
                 ]
 
                 if !skipContext {
-                    // Add conversation history
                     for turn in self.conversationHistory.suffix(self.config.maxContextRounds) {
                         messages.append(["role": "user", "content": turn.userMessage])
                         messages.append(["role": "assistant", "content": turn.assistantMessage])
@@ -98,40 +96,38 @@ actor MLXLLMEngine {
                 var tokenCount = 0
 
                 do {
-                    let result = try await container.perform { (model, tokenizer) in
-                        // Apply chat template
-                        let chatPrompt = tokenizer.applyChatTemplate(
-                            messages: messages
-                        )
-                        let promptTokens = tokenizer.encode(text: chatPrompt)
+                    // applyChatTemplate returns [Int] (already tokenized)
+                    let promptTokens = try await container.applyChatTemplate(messages: messages)
 
-                        // Stream generate
+                    let result = try await container.perform { (context) in
+                        let input = LMInput(tokens: MLXArray(promptTokens))
                         return try MLXLMCommon.generate(
-                            input: .init(tokens: MLXArray(promptTokens)),
-                            parameters: .init(
+                            input: input,
+                            parameters: GenerateParameters(
+                                maxTokens: self.config.maxTokens,
                                 temperature: self.config.temperature,
                                 topP: self.config.topP
                             ),
-                            model: model,
-                            tokenizer: tokenizer,
-                            extraEOSTokens: nil
-                        ) { tokens in
-                            // This callback is called per token
-                            if let text = tokenizer.decode(tokens: [tokens.tokens.last!.item(Int.self)]) {
-                                continuation.yield(text)
-                                fullResponse += text
-                                tokenCount += 1
-                            }
-                            // Continue generating up to maxTokens
-                            return tokenCount < self.config.maxTokens ? .more : .stop
+                            context: context
+                        )
+                    }
+
+                    // Stream the generation
+                    for await generation in result {
+                        switch generation {
+                        case .chunk(let text):
+                            continuation.yield(text)
+                            fullResponse += text
+                            tokenCount += 1
+                        case .info, .toolCall:
+                            break // completion info / tool calls, ignore
                         }
                     }
 
                     let elapsed = CFAbsoluteTimeGetCurrent() - startTime
-                    let tps = Double(tokenCount) / elapsed
-                    mlxLog("[LLM] Generated \(tokenCount) tokens in \(String(format: "%.2f", elapsed))s (\(String(format: "%.1f", tps)) tok/s)")
+                    let tps = elapsed > 0 ? Double(tokenCount) / elapsed : 0
+                    mlxLog("[LLM] Generated \(tokenCount) chunks in \(String(format: "%.2f", elapsed))s (\(String(format: "%.1f", tps)) tok/s)")
 
-                    // Save to context
                     if !skipContext && !fullResponse.isEmpty {
                         await self.addToContext(user: prompt, assistant: fullResponse)
                     }
@@ -155,7 +151,6 @@ actor MLXLLMEngine {
 
     // MARK: - Context Management
 
-    /// Add a completed exchange to conversation history.
     private func addToContext(user: String, assistant: String) {
         conversationHistory.append(ConversationTurn(
             userMessage: user,
@@ -164,21 +159,18 @@ actor MLXLLMEngine {
         pruneContextIfNeeded()
     }
 
-    /// Remove oldest turns when exceeding token budget.
     private func pruneContextIfNeeded() {
         while estimateTokenCount() > config.contextWindowSize && !conversationHistory.isEmpty {
             conversationHistory.removeFirst()
         }
     }
 
-    /// Rough token estimation (same heuristic as MacEcho: len/2).
     private func estimateTokenCount() -> Int {
         conversationHistory.reduce(0) { total, turn in
             total + (turn.userMessage.count + turn.assistantMessage.count) / 2
         }
     }
 
-    /// Clear all conversation context.
     func clearContext() {
         conversationHistory.removeAll()
     }
@@ -190,4 +182,3 @@ struct ConversationTurn: Sendable {
     let userMessage: String
     let assistantMessage: String
 }
-

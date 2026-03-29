@@ -195,9 +195,12 @@ final class VoiceEngine: ObservableObject {
     /// Expects Float32 PCM at 16 kHz. Internally buffers and processes
     /// 32 ms frames through the VAD.
     func processAudioSamples(_ samples: [Float]) async {
-        guard state == .ready || state == .listening || state == .processing else { return }
+        switch state {
+        case .ready, .listening, .processing: break
+        default: return
+        }
 
-        if state == .ready {
+        if case .ready = state {
             state = .listening
         }
 
