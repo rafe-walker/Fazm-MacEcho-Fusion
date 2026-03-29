@@ -597,6 +597,13 @@ class PushToTalkManager: ObservableObject {
   // MARK: - Audio Transcription (Dedicated Session)
 
   private func startAudioTranscription() {
+    // [MLX-FUSION] Route through local MLX pipeline if available
+    if VoiceEngineBridge.shared.shouldUseLocalPipeline && ShortcutSettings.shared.pttTranscriptionMode != .batch {
+      VoiceEngineBridge.shared.startLocalSession()
+      startMicCapture(localMLX: true)
+      log("PushToTalkManager: using LOCAL MLX pipeline")
+      return
+    }
     // Always re-check permission (it can be granted at any time via System Settings)
     hasMicPermission = AudioCaptureService.checkPermission()
 
@@ -668,7 +675,7 @@ class PushToTalkManager: ObservableObject {
     }
   }
 
-  private func startMicCapture(batchMode: Bool = false) {
+  private func startMicCapture(batchMode: Bool = false, localMLX: Bool = false) {
     if audioCaptureService == nil {
       audioCaptureService = AudioCaptureService()
     }
@@ -686,6 +693,9 @@ class PushToTalkManager: ObservableObject {
               self.batchAudioLock.lock()
               self.batchAudioBuffer.append(audioData)
               self.batchAudioLock.unlock()
+            } else if localMLX {
+              // [MLX-FUSION] Route to local MLX VoiceEngine
+              VoiceEngineBridge.shared.processAudioChunk(audioData)
             } else {
               // Live mode: stream to Deepgram
               self.transcriptionService?.sendAudio(audioData)
@@ -710,6 +720,8 @@ class PushToTalkManager: ObservableObject {
   }
 
   private func stopAudioTranscription() {
+    // [MLX-FUSION] Stop local pipeline if active
+    VoiceEngineBridge.shared.stopLocalSession()
     audioCaptureService?.stopCapture()
     transcriptionService?.stop()
     transcriptionService = nil

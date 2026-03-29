@@ -109,6 +109,8 @@ struct FazmApp: App {
                 .task {
                     // Store openWindow action globally so AppDelegate can reopen the window
                     WindowOpener.shared.openWindow = openWindow
+                    // [MLX-FUSION] Initialize local voice engine (loads models in background)
+                    await VoiceEngine.shared.initialize()
                 }
         }
         .windowStyle(.titleBar)

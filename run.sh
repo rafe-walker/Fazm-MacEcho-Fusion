@@ -161,6 +161,16 @@ fi
 step "Checking schema docs..."
 bash scripts/check_schema_docs.sh
 
+# [MLX-FUSION] Check if MLX models are pre-downloaded
+step "Checking MLX voice engine models..."
+MLX_CACHE="${HOME}/.cache/huggingface/hub"
+if [ ! -d "${MLX_CACHE}/models--mlx-community--Qwen2.5-7B-Instruct-4bit" ]; then
+    substep "MLX models not cached yet. Run ./setup-mlx-models.sh to pre-download."
+    substep "Models will auto-download on first launch (may take a few minutes)."
+else
+    substep "MLX models found in cache"
+fi
+
 step "Building Swift app (swift build -c debug)..."
 xcrun swift build -c debug --package-path Desktop
 
