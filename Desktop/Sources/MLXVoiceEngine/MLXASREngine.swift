@@ -50,31 +50,31 @@ actor MLXASREngine {
         // Try SenseVoice first (preferred — matches MacEcho pipeline)
         if config.modelID.lowercased().contains("sensevoice") {
             do {
-                log("[ASR] Loading SenseVoice: \(config.modelID)")
+                mlxLog("[ASR] Loading SenseVoice: \(config.modelID)")
                 let model = try await SenseVoiceModel.fromPretrained(config.modelID)
                 self.senseVoiceModel = model
                 self.activeModelType = .senseVoice
                 isReady = true
                 let elapsed = CFAbsoluteTimeGetCurrent() - startTime
-                log("[ASR] SenseVoice loaded in \(String(format: "%.2f", elapsed))s")
+                mlxLog("[ASR] SenseVoice loaded in \(String(format: "%.2f", elapsed))s")
                 return
             } catch {
-                log("[ASR] SenseVoice load failed: \(error). Falling back to Qwen3-ASR.")
+                mlxLog("[ASR] SenseVoice load failed: \(error). Falling back to Qwen3-ASR.")
             }
         }
 
         // Fallback: Qwen3-ASR
         let fallbackID = "mlx-community/Qwen3-ASR-1.7B-bf16"
-        log("[ASR] Loading Qwen3-ASR: \(fallbackID)")
+        mlxLog("[ASR] Loading Qwen3-ASR: \(fallbackID)")
         do {
             let model = try await Qwen3ASRModel.fromPretrained(fallbackID)
             self.genericSTTModel = model
             self.activeModelType = .qwen3ASR
             isReady = true
             let elapsed = CFAbsoluteTimeGetCurrent() - startTime
-            log("[ASR] Qwen3-ASR loaded in \(String(format: "%.2f", elapsed))s")
+            mlxLog("[ASR] Qwen3-ASR loaded in \(String(format: "%.2f", elapsed))s")
         } catch {
-            log("[ASR] Qwen3-ASR also failed: \(error)")
+            mlxLog("[ASR] Qwen3-ASR also failed: \(error)")
             throw error
         }
     }
@@ -82,7 +82,7 @@ actor MLXASREngine {
     /// Warm up the model with a short dummy input.
     func warmUp() async {
         guard isReady else { return }
-        log("[ASR] Warming up \(activeModelType?.rawValue ?? "unknown")...")
+        mlxLog("[ASR] Warming up \(activeModelType?.rawValue ?? "unknown")...")
         let silenceSamples = [Float](repeating: 0.0, count: 16_000)
         let audioArray = MLXArray(silenceSamples)
 
@@ -104,7 +104,7 @@ actor MLXASREngine {
         case nil:
             break
         }
-        log("[ASR] Warm-up complete")
+        mlxLog("[ASR] Warm-up complete")
     }
 
     // MARK: - Transcription
@@ -112,7 +112,7 @@ actor MLXASREngine {
     /// Transcribe a speech segment (raw Float32 PCM @ 16 kHz).
     func transcribe(audioSamples: [Float]) async throws -> ASRResult? {
         guard isReady else {
-            log("[ASR] Model not ready, skipping transcription")
+            mlxLog("[ASR] Model not ready, skipping transcription")
             return nil
         }
 
@@ -153,7 +153,7 @@ actor MLXASREngine {
         let elapsed = CFAbsoluteTimeGetCurrent() - startTime
         let audioDuration = Double(audioSamples.count) / 16_000.0
 
-        log("[ASR] [\(activeModelType?.rawValue ?? "?")] Transcribed \(String(format: "%.1f", audioDuration))s → \(String(format: "%.3f", elapsed))s: \"\(text.prefix(80))\"")
+        mlxLog("[ASR] [\(activeModelType?.rawValue ?? "?")] Transcribed \(String(format: "%.1f", audioDuration))s → \(String(format: "%.3f", elapsed))s: \"\(text.prefix(80))\"")
 
         return ASRResult(
             text: text,
@@ -180,8 +180,3 @@ struct ASRResult: Sendable {
     let modelType: ASRModelType
 }
 
-// MARK: - Logging Helper
-
-private func log(_ message: String) {
-    NSLog("[MLXVoiceEngine] %@", message)
-}

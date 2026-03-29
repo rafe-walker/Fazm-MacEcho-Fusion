@@ -144,9 +144,12 @@ final class VoiceEngine: ObservableObject {
     /// Load all models. Call on app launch (or lazily on first use).
     /// Models are cached in ~/.cache/huggingface/ after first download.
     func initialize() async {
-        guard state == .uninitialized || state == .error("") else { return }
+        guard case .uninitialized = state else {
+            // Also allow re-initialization from error state
+            if case .error = state { } else { return }
+        }
         state = .loading
-        log("[Engine] Initializing MLX Voice Engine...")
+        mlxLog("[Engine] Initializing MLX Voice Engine...")
 
         do {
             // Load models in parallel where possible
@@ -162,7 +165,7 @@ final class VoiceEngine: ObservableObject {
 
             // Warm up models for faster first inference
             if config.pipeline.warmUpOnLaunch {
-                log("[Engine] Warming up models...")
+                mlxLog("[Engine] Warming up models...")
                 await vad.reset()  // No warm-up needed, ~40μs per frame
                 await asr.warmUp()
                 await llm.warmUp()
@@ -172,17 +175,17 @@ final class VoiceEngine: ObservableObject {
             state = .ready
             isModelLoaded = true
             eventPublisher.send(.engineReady)
-            log("[Engine] All models loaded and ready")
+            mlxLog("[Engine] All models loaded and ready")
 
             // Log which ASR model was loaded
             let asrModel = await asr.currentModel
-            log("[Engine] ASR model: \(asrModel?.rawValue ?? "none")")
+            mlxLog("[Engine] ASR model: \(asrModel?.rawValue ?? "none")")
 
         } catch {
             let msg = "Model loading failed: \(error.localizedDescription)"
             state = .error(msg)
             eventPublisher.send(.engineError(msg))
-            log("[Engine] ERROR: \(msg)")
+            mlxLog("[Engine] ERROR: \(msg)")
         }
     }
 
@@ -253,14 +256,14 @@ final class VoiceEngine: ObservableObject {
 
         // 1. ASR: Transcribe the speech segment
         guard let asrResult = try? await asr.transcribe(audioSamples: segment.audio) else {
-            log("[Engine] ASR returned nil")
+            mlxLog("[Engine] ASR returned nil")
             state = .listening
             return
         }
 
         let transcribedText = asrResult.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !transcribedText.isEmpty else {
-            log("[Engine] Empty transcription, ignoring")
+            mlxLog("[Engine] Empty transcription, ignoring")
             state = .listening
             return
         }
@@ -326,7 +329,7 @@ final class VoiceEngine: ObservableObject {
                 try await tts.speak(sentence)
             }
         } catch {
-            log("[Engine] TTS error: \(error)")
+            mlxLog("[Engine] TTS error: \(error)")
         }
 
         eventPublisher.send(.ttsDone)
@@ -344,7 +347,7 @@ final class VoiceEngine: ObservableObject {
         }
         sentencizer = LLMSentencizer()
         eventPublisher.send(.interrupted)
-        log("[Engine] Pipeline interrupted")
+        mlxLog("[Engine] Pipeline interrupted")
     }
 
     /// Stop all processing and reset state.
@@ -362,8 +365,3 @@ final class VoiceEngine: ObservableObject {
     }
 }
 
-// MARK: - Logging
-
-private func log(_ message: String) {
-    NSLog("[MLXVoiceEngine] %@", message)
-}

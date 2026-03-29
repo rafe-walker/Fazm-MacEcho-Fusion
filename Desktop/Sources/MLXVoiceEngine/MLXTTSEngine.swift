@@ -38,7 +38,7 @@ actor MLXTTSEngine {
 
     func loadModel() async throws {
         guard config.enabled else {
-            log("[TTS] TTS disabled in config, skipping load")
+            mlxLog("[TTS] TTS disabled in config, skipping load")
             return
         }
         guard !isLoading && !isReady else { return }
@@ -46,7 +46,7 @@ actor MLXTTSEngine {
         defer { isLoading = false }
 
         let startTime = CFAbsoluteTimeGetCurrent()
-        log("[TTS] Loading TTS model: \(config.modelID)")
+        mlxLog("[TTS] Loading TTS model: \(config.modelID)")
 
         let loadedModel = try await Qwen3TTSModel.fromPretrained(config.modelID)
         self.model = loadedModel
@@ -56,13 +56,13 @@ actor MLXTTSEngine {
         setupAudioEngine()
 
         let elapsed = CFAbsoluteTimeGetCurrent() - startTime
-        log("[TTS] Model loaded in \(String(format: "%.2f", elapsed))s")
+        mlxLog("[TTS] Model loaded in \(String(format: "%.2f", elapsed))s")
     }
 
     /// Warm up TTS with a short phrase.
     func warmUp() async {
         guard isReady, let model else { return }
-        log("[TTS] Warming up TTS...")
+        mlxLog("[TTS] Warming up TTS...")
         do {
             let _ = try await model.generate(
                 text: "OK",
@@ -72,9 +72,9 @@ actor MLXTTSEngine {
                 language: "en",
                 generationParameters: AudioGenerateParameters(maxTokens: 50)
             )
-            log("[TTS] Warm-up complete")
+            mlxLog("[TTS] Warm-up complete")
         } catch {
-            log("[TTS] Warm-up error (non-fatal): \(error)")
+            mlxLog("[TTS] Warm-up error (non-fatal): \(error)")
         }
     }
 
@@ -86,7 +86,7 @@ actor MLXTTSEngine {
         guard let model, isReady, config.enabled else { return }
 
         let startTime = CFAbsoluteTimeGetCurrent()
-        log("[TTS] Synthesizing: \"\(text.prefix(60))\"")
+        mlxLog("[TTS] Synthesizing: \"\(text.prefix(60))\"")
 
         let audio = try await model.generate(
             text: text,
@@ -104,7 +104,7 @@ actor MLXTTSEngine {
         let audioSamples = audio.asArray(Float.self)
         let audioDuration = Double(audioSamples.count) / Double(config.sampleRate)
         let rtf = elapsed / audioDuration
-        log("[TTS] Synthesized \(String(format: "%.1f", audioDuration))s audio in \(String(format: "%.2f", elapsed))s (RTF: \(String(format: "%.2f", rtf)))")
+        mlxLog("[TTS] Synthesized \(String(format: "%.1f", audioDuration))s audio in \(String(format: "%.2f", elapsed))s (RTF: \(String(format: "%.2f", rtf)))")
 
         // Play audio
         await playAudio(samples: audioSamples, sampleRate: model.sampleRate)
@@ -115,7 +115,7 @@ actor MLXTTSEngine {
         guard let model, isReady, config.enabled else { return }
 
         let startTime = CFAbsoluteTimeGetCurrent()
-        log("[TTS] Streaming synthesis: \"\(text.prefix(60))\"")
+        mlxLog("[TTS] Streaming synthesis: \"\(text.prefix(60))\"")
 
         var firstChunkTime: Double?
 
@@ -137,19 +137,19 @@ actor MLXTTSEngine {
             case .audio(let audioChunk):
                 if firstChunkTime == nil {
                     firstChunkTime = CFAbsoluteTimeGetCurrent() - startTime
-                    log("[TTS] First chunk in \(String(format: "%.3f", firstChunkTime!))s")
+                    mlxLog("[TTS] First chunk in \(String(format: "%.3f", firstChunkTime!))s")
                 }
                 let samples = audioChunk.asArray(Float.self)
                 await playAudioChunk(samples: samples, sampleRate: model.sampleRate)
             case .token:
                 break  // Progress indicator, ignore
             case .info(let info):
-                log("[TTS] Generation info: \(info.summary)")
+                mlxLog("[TTS] Generation info: \(info.summary)")
             }
         }
 
         let elapsed = CFAbsoluteTimeGetCurrent() - startTime
-        log("[TTS] Streaming synthesis complete in \(String(format: "%.2f", elapsed))s")
+        mlxLog("[TTS] Streaming synthesis complete in \(String(format: "%.2f", elapsed))s")
     }
 
     /// Stop any ongoing playback (for interruption support).
@@ -174,9 +174,9 @@ actor MLXTTSEngine {
             try engine.start()
             self.audioEngine = engine
             self.audioPlayer = player
-            log("[TTS] Audio engine started")
+            mlxLog("[TTS] Audio engine started")
         } catch {
-            log("[TTS] Failed to start audio engine: \(error)")
+            mlxLog("[TTS] Failed to start audio engine: \(error)")
         }
     }
 
@@ -241,8 +241,3 @@ actor MLXTTSEngine {
     }
 }
 
-// MARK: - Logging Helper
-
-private func log(_ message: String) {
-    NSLog("[MLXVoiceEngine] %@", message)
-}

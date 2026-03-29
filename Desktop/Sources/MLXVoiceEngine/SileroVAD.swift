@@ -11,7 +11,6 @@
 //
 
 import Foundation
-import MLX
 import SpeechVAD
 
 // MARK: - VAD State
@@ -48,7 +47,7 @@ actor SileroVADProcessor {
 
     // MARK: - Neural Model
 
-    private var vadModel: SileroVAD?
+    private var vadModel: SileroVADModel?
     private var isReady = false
 
     // MARK: - Internal State
@@ -87,14 +86,15 @@ actor SileroVADProcessor {
         guard !isReady else { return }
 
         let startTime = CFAbsoluteTimeGetCurrent()
-        log("[VAD] Loading Silero VAD v5 (MLX)...")
+        mlxLog("[VAD] Loading Silero VAD v5 (MLX)...")
 
-        let model = try await SileroVAD.fromPretrained()
+        // speech-swift exports SileroVADModel (not SileroVAD)
+        let model = try await SileroVADModel.fromPretrained()
         self.vadModel = model
         isReady = true
 
         let elapsed = CFAbsoluteTimeGetCurrent() - startTime
-        log("[VAD] Silero VAD loaded in \(String(format: "%.3f", elapsed))s")
+        mlxLog("[VAD] Silero VAD loaded in \(String(format: "%.3f", elapsed))s")
     }
 
     // MARK: - Frame Processing
@@ -107,8 +107,8 @@ actor SileroVADProcessor {
         }
 
         // Run Silero VAD inference on this frame
-        let audioArray = MLXArray(frame)
-        let speechProb = model.predict(audioArray)
+        // speech-swift API: processChunk(_ samples: [Float]) -> Float (probability)
+        let speechProb = model.processChunk(frame)
         let isSpeech = speechProb > config.threshold
 
         // Update padding ring buffer
@@ -164,6 +164,8 @@ actor SileroVADProcessor {
         speechBuffer.removeAll()
         silenceFrameCount = 0
         speechFrameCount = 0
+        // Reset the model's internal LSTM state
+        vadModel?.resetState()
     }
 
     // MARK: - Private Helpers
@@ -174,8 +176,3 @@ actor SileroVADProcessor {
     }
 }
 
-// MARK: - Logging
-
-private func log(_ message: String) {
-    NSLog("[MLXVoiceEngine] %@", message)
-}

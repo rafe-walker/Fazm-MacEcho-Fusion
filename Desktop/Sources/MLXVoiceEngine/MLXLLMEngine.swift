@@ -40,7 +40,7 @@ actor MLXLLMEngine {
         defer { isLoading = false }
 
         let startTime = CFAbsoluteTimeGetCurrent()
-        log("[LLM] Loading model: \(config.modelID)")
+        mlxLog("[LLM] Loading model: \(config.modelID)")
 
         let container = try await LLMModelFactory.shared.loadContainer(
             configuration: ModelConfiguration(id: config.modelID)
@@ -49,20 +49,20 @@ actor MLXLLMEngine {
         isReady = true
 
         let elapsed = CFAbsoluteTimeGetCurrent() - startTime
-        log("[LLM] Model loaded in \(String(format: "%.2f", elapsed))s")
+        mlxLog("[LLM] Model loaded in \(String(format: "%.2f", elapsed))s")
     }
 
     /// Warm up with a short generation to prime Metal.
     func warmUp() async {
         guard isReady else { return }
-        log("[LLM] Warming up Qwen...")
+        mlxLog("[LLM] Warming up Qwen...")
         // Generate a short response to prime caches
         var discarded = ""
         for await token in generateStream(prompt: "Hi", skipContext: true) {
             discarded += token
             if discarded.count > 5 { break }
         }
-        log("[LLM] Warm-up complete")
+        mlxLog("[LLM] Warm-up complete")
     }
 
     // MARK: - Generation
@@ -73,7 +73,7 @@ actor MLXLLMEngine {
         AsyncStream { continuation in
             Task {
                 guard let container = self.modelContainer, self.isReady else {
-                    log("[LLM] Model not ready")
+                    mlxLog("[LLM] Model not ready")
                     continuation.finish()
                     return
                 }
@@ -129,14 +129,14 @@ actor MLXLLMEngine {
 
                     let elapsed = CFAbsoluteTimeGetCurrent() - startTime
                     let tps = Double(tokenCount) / elapsed
-                    log("[LLM] Generated \(tokenCount) tokens in \(String(format: "%.2f", elapsed))s (\(String(format: "%.1f", tps)) tok/s)")
+                    mlxLog("[LLM] Generated \(tokenCount) tokens in \(String(format: "%.2f", elapsed))s (\(String(format: "%.1f", tps)) tok/s)")
 
                     // Save to context
                     if !skipContext && !fullResponse.isEmpty {
                         await self.addToContext(user: prompt, assistant: fullResponse)
                     }
                 } catch {
-                    log("[LLM] Generation error: \(error)")
+                    mlxLog("[LLM] Generation error: \(error)")
                 }
 
                 continuation.finish()
@@ -191,8 +191,3 @@ struct ConversationTurn: Sendable {
     let assistantMessage: String
 }
 
-// MARK: - Logging Helper
-
-private func log(_ message: String) {
-    NSLog("[MLXVoiceEngine] %@", message)
-}

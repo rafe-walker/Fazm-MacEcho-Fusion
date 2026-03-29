@@ -90,7 +90,7 @@ final class VoiceEngineBridge: ObservableObject {
     /// Start the local pipeline for a PTT session.
     func startLocalSession() {
         guard VoiceEngine.shared.isModelLoaded else {
-            log("[Bridge] Models not loaded, falling back to cloud")
+            mlxLog("[Bridge] Models not loaded, falling back to cloud")
             isLocalPipelineActive = false
             return
         }
@@ -99,7 +99,7 @@ final class VoiceEngineBridge: ObservableObject {
         currentTranscript = ""
         currentResponse = ""
         isProcessing = false
-        log("[Bridge] Local pipeline session started")
+        mlxLog("[Bridge] Local pipeline session started")
     }
 
     /// Stop the local pipeline session.
@@ -107,7 +107,7 @@ final class VoiceEngineBridge: ObservableObject {
         VoiceEngine.shared.stop()
         isLocalPipelineActive = false
         isProcessing = false
-        log("[Bridge] Local pipeline session stopped")
+        mlxLog("[Bridge] Local pipeline session stopped")
     }
 
     // MARK: - Event Handling
@@ -139,10 +139,10 @@ final class VoiceEngineBridge: ObservableObject {
             isProcessing = false
 
         case .engineReady:
-            log("[Bridge] Engine ready")
+            mlxLog("[Bridge] Engine ready")
 
         case .engineError(let msg):
-            log("[Bridge] Engine error: \(msg)")
+            mlxLog("[Bridge] Engine error: \(msg)")
             isLocalPipelineActive = false
 
         default:
@@ -189,8 +189,3 @@ final class VoiceEngineBridge: ObservableObject {
     }
 }
 
-// MARK: - Logging
-
-private func log(_ message: String) {
-    NSLog("[MLXVoiceEngine] %@", message)
-}
