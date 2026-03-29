@@ -1128,6 +1128,7 @@ async function handleQuery(msg: QueryMessage): Promise<void> {
     };
 
     // Send the prompt — retry with fresh session if stale
+    const wasInterrupted = interruptedSessions.has(sessionId);
     let promptStartTime = Date.now();
     const sendPrompt = async (): Promise<void> => {
       const promptBlocks: Array<Record<string, unknown>> = [];
@@ -1144,17 +1145,51 @@ async function handleQuery(msg: QueryMessage): Promise<void> {
       };
 
       promptStartTime = Date.now();
-      logErr(`[TIMING] session/prompt request sending (sessionId=${sessionId}, promptLength=${fullPrompt.length})`);
+      logErr(`[TIMING] session/prompt request sending (sessionId=${sessionId}, promptLength=${fullPrompt.length}${wasInterrupted ? ", TTFT watchdog active" : ""})`);
 
-      const promptResult = (await acpRequest("session/prompt", sessionPromptPayload)) as {
-        stopReason: string;
-        // Populated by patched-acp-entry.mjs intercepting SDKResultSuccess
-        usage?: { inputTokens: number; outputTokens: number; cachedReadTokens?: number | null; cachedWriteTokens?: number | null; totalTokens: number };
-        _meta?: { costUsd?: number };
-      };
+      // TTFT watchdog: if this session was previously interrupted, ACP may silently
+      // drop the prompt (broken session state after cancel mid-tool-call). Race the
+      // prompt against a 30s timer — if no notifications arrive, assume the session
+      // is dead and throw so the outer retry logic can create a fresh session.
+      const TTFT_WATCHDOG_MS = 30_000;
+      let watchdogTimer: ReturnType<typeof setTimeout> | null = null;
+      let watchdogReject: ((err: Error) => void) | null = null;
 
-      const promptDurationMs = Date.now() - promptStartTime;
-      logErr(`Prompt completed: stopReason=${promptResult.stopReason} duration=${promptDurationMs}ms`);
+      const promptPromise = acpRequest("session/prompt", sessionPromptPayload);
+
+      let racePromise: Promise<unknown>;
+      if (wasInterrupted && !isNewSession) {
+        const watchdogPromise = new Promise<never>((_, reject) => {
+          watchdogReject = reject;
+          watchdogTimer = setTimeout(() => {
+            if (notificationCount === 0) {
+              reject(new Error("TTFT_WATCHDOG: session unresponsive after interrupt — no notifications in 30s"));
+            } else {
+              // Notifications are flowing, session is alive — let the prompt finish normally
+              watchdogTimer = null;
+            }
+          }, TTFT_WATCHDOG_MS);
+        });
+        racePromise = Promise.race([promptPromise, watchdogPromise]);
+      } else {
+        racePromise = promptPromise;
+      }
+
+      try {
+        const promptResult = (await racePromise) as {
+          stopReason: string;
+          usage?: { inputTokens: number; outputTokens: number; cachedReadTokens?: number | null; cachedWriteTokens?: number | null; totalTokens: number };
+          _meta?: { costUsd?: number };
+        };
+
+        // Session responded successfully — clear the interrupted mark
+        if (wasInterrupted) {
+          interruptedSessions.delete(sessionId);
+          logErr(`Session ${sessionId} recovered after interrupt — cleared watchdog`);
+        }
+
+        const promptDurationMs = Date.now() - promptStartTime;
+        logErr(`Prompt completed: stopReason=${promptResult.stopReason} duration=${promptDurationMs}ms`);
 
       // Increment image turn counter so we know when to stop including screenshots.
       // Image turn counting removed — screenshots are now read by the model via Read tool
